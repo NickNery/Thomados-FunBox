@@ -1,11 +1,25 @@
 import { useState } from 'react';
 import BezierCurveEditor from './components/BezierCurveEditor';
-import { applyTemporalEaseToSelection, evalHostScript, isCepRuntime } from './cep/bridge';
+import TextAnimationGallery from './components/TextAnimationGallery';
+import {
+  applyTemporalEaseToSelection,
+  applyTextAnimation,
+  bakeCurveToSelection,
+  evalHostScript,
+  isCepRuntime
+} from './cep/bridge';
+import type { BakeCurvePayload, TemporalEasePayload, TextAnimationPayload } from './cep/bridge';
 
 type PingState = {
   loading: boolean;
   output: string;
   error: string;
+};
+
+type ApplyMode = 'bezier' | 'bake' | 'text';
+
+type ApplyState = PingState & {
+  mode: ApplyMode | null;
 };
 
 export default function App() {
@@ -14,10 +28,11 @@ export default function App() {
     output: '',
     error: ''
   });
-  const [applyState, setApplyState] = useState<PingState>({
+  const [applyState, setApplyState] = useState<ApplyState>({
     loading: false,
     output: '',
-    error: ''
+    error: '',
+    mode: null
   });
 
   async function handleHostPing() {
@@ -29,6 +44,26 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setPing({ loading: false, output: '', error: message });
+    }
+  }
+
+  async function runApply(mode: ApplyMode, runner: () => Promise<unknown>) {
+    setApplyState({ loading: true, output: '', error: '', mode });
+
+    try {
+      const response = await runner();
+      const formatted = JSON.stringify(response, null, 2);
+      const isOk = typeof response === 'object' && response !== null && 'ok' in response && response.ok === true;
+
+      setApplyState({
+        loading: false,
+        output: formatted,
+        error: isOk ? '' : (response as { message?: string }).message || formatted,
+        mode: null
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setApplyState({ loading: false, output: '', error: message, mode: null });
     }
   }
 
@@ -46,24 +81,15 @@ export default function App() {
         </header>
 
         <BezierCurveEditor
-          isApplying={applyState.loading}
-          onApply={async (payload) => {
-            setApplyState({ loading: true, output: '', error: '' });
+          isApplying={applyState.loading && applyState.mode === 'bezier'}
+          isBaking={applyState.loading && applyState.mode === 'bake'}
+          onApply={(payload: TemporalEasePayload) => runApply('bezier', () => applyTemporalEaseToSelection(payload))}
+          onBake={(payload: BakeCurvePayload) => runApply('bake', () => bakeCurveToSelection(payload))}
+        />
 
-            try {
-              const response = await applyTemporalEaseToSelection(payload);
-              const formatted = JSON.stringify(response, null, 2);
-
-              setApplyState({
-                loading: false,
-                output: formatted,
-                error: response.ok ? '' : response.message || formatted
-              });
-            } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
-              setApplyState({ loading: false, output: '', error: message });
-            }
-          }}
+        <TextAnimationGallery
+          isApplying={applyState.loading && applyState.mode === 'text'}
+          onApply={(payload: TextAnimationPayload) => runApply('text', () => applyTextAnimation(payload))}
         />
 
         {(applyState.output || applyState.error) && (

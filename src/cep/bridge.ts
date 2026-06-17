@@ -29,6 +29,22 @@ export type TemporalEasePayload = {
   };
 };
 
+export type BakeCurvePayload = TemporalEasePayload & {
+  bake: {
+    samples: number;
+    replaceInteriorKeys: boolean;
+  };
+};
+
+export type TextAnimationType = 'pop-in' | 'slide-up' | 'fade-scale' | 'typewriter';
+
+export type TextAnimationPayload = {
+  type: TextAnimationType;
+  duration: number;
+  text?: string;
+  videoTrackOffset?: number;
+};
+
 export type HostApplyResponse = {
   ok: boolean;
   message?: string;
@@ -38,6 +54,19 @@ export type HostApplyResponse = {
   properties?: number;
   keys?: number;
   fallbacks?: number;
+  temporalEaseApplied?: number;
+  interpolationApplied?: number;
+  selectionLimitedProperties?: number;
+  bakedKeys?: number;
+  intervals?: number;
+  removedKeys?: number;
+  unsupportedProperties?: number;
+  linearizedKeys?: number;
+  animationType?: TextAnimationType;
+  mogrtPath?: string;
+  trackIndex?: number;
+  clipName?: string;
+  animatedProperties?: string[];
   warnings?: string[];
 };
 
@@ -89,6 +118,36 @@ function toExtendScriptLiteral(value: unknown) {
 
 export async function applyTemporalEaseToSelection(payload: TemporalEasePayload): Promise<HostApplyResponse> {
   const script = `thomadosFunBox_applyTemporalEase(${toExtendScriptLiteral(payload)})`;
+  const rawResponse = await evalHostScript(script);
+
+  try {
+    return JSON.parse(rawResponse) as HostApplyResponse;
+  } catch {
+    return {
+      ok: false,
+      message: rawResponse || 'Resposta invalida do host JSX.',
+      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
+    };
+  }
+}
+
+export async function bakeCurveToSelection(payload: BakeCurvePayload): Promise<HostApplyResponse> {
+  const script = `thomadosFunBox_bakeCurve(${toExtendScriptLiteral(payload)})`;
+  const rawResponse = await evalHostScript(script);
+
+  try {
+    return JSON.parse(rawResponse) as HostApplyResponse;
+  } catch {
+    return {
+      ok: false,
+      message: rawResponse || 'Resposta invalida do host JSX.',
+      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
+    };
+  }
+}
+
+export async function applyTextAnimation(payload: TextAnimationPayload): Promise<HostApplyResponse> {
+  const script = `thomadosFunBox_applyTextAnimation(${toExtendScriptLiteral(payload)})`;
   const rawResponse = await evalHostScript(script);
 
   try {

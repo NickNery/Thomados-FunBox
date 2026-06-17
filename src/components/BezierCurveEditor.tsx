@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import type { TemporalEasePayload } from '../cep/bridge';
+import type { BakeCurvePayload, TemporalEasePayload } from '../cep/bridge';
 
 type HandleName = 'outgoing' | 'incoming';
 
@@ -17,7 +17,9 @@ type CurvePreset = {
 
 type BezierCurveEditorProps = {
   isApplying: boolean;
+  isBaking: boolean;
   onApply: (payload: TemporalEasePayload) => Promise<void>;
+  onBake: (payload: BakeCurvePayload) => Promise<void>;
 };
 
 const STORAGE_KEY = 'thomados.funbox.bezierCurvePresets';
@@ -141,7 +143,7 @@ function makePresetId(name: string) {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
 }
 
-export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEditorProps) {
+export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBake }: BezierCurveEditorProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [outgoing, setOutgoing] = useState<CurvePoint>({ x: 0.33, y: 0.1 });
   const [incoming, setIncoming] = useState<CurvePoint>({ x: 0.67, y: 0.9 });
@@ -149,6 +151,8 @@ export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEd
   const [presets, setPresets] = useState<CurvePreset[]>(loadStoredPresets);
   const [selectedPresetId, setSelectedPresetId] = useState(DEFAULT_PRESETS[0].id);
   const [presetName, setPresetName] = useState('Minha curva');
+  const [bakeSamples, setBakeSamples] = useState(8);
+  const [replaceInteriorKeys, setReplaceInteriorKeys] = useState(true);
 
   const ease = useMemo(() => calculateEase(outgoing, incoming), [outgoing, incoming]);
   const outgoingSvg = pointToSvg(outgoing);
@@ -206,8 +210,8 @@ export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEd
     persistUserPresets(nextPresets);
   }
 
-  async function applyCurve() {
-    await onApply({
+  function createPayload(): TemporalEasePayload {
+    return {
       curve: {
         outgoing,
         incoming
@@ -217,8 +221,24 @@ export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEd
         presetName,
         createdAt: new Date().toISOString()
       }
+    };
+  }
+
+  async function applyCurve() {
+    await onApply(createPayload());
+  }
+
+  async function bakeCurve() {
+    await onBake({
+      ...createPayload(),
+      bake: {
+        samples: bakeSamples,
+        replaceInteriorKeys
+      }
     });
   }
+
+  const isBusy = isApplying || isBaking;
 
   return (
     <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
@@ -227,14 +247,24 @@ export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEd
           <h2 className="text-base font-semibold">Editor de Curvas</h2>
           <p className="mt-1 text-sm text-zinc-400">Speed / Influence</p>
         </div>
-        <button
-          type="button"
-          onClick={applyCurve}
-          disabled={isApplying}
-          className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isApplying ? 'Aplicando...' : 'Aplicar'}
-        </button>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <button
+            type="button"
+            onClick={applyCurve}
+            disabled={isBusy}
+            className="rounded-md border border-funbox-line px-3 py-2 text-sm font-semibold text-zinc-100 transition hover:border-funbox-accent disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isApplying ? 'Aplicando...' : 'Aplicar Bezier'}
+          </button>
+          <button
+            type="button"
+            onClick={bakeCurve}
+            disabled={isBusy}
+            className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isBaking ? 'Gerando...' : 'Bake Curve'}
+          </button>
+        </div>
       </div>
 
       <svg
@@ -301,6 +331,29 @@ export default function BezierCurveEditor({ isApplying, onApply }: BezierCurveEd
           <p className="mt-1 text-zinc-300">Speed {ease.incoming.speed}</p>
           <p className="text-zinc-300">Influence {ease.incoming.influence}%</p>
         </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 rounded-md border border-funbox-line bg-black/20 p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+        <label className="grid gap-1 text-zinc-300">
+          <span className="font-semibold text-zinc-100">Amostras do bake</span>
+          <input
+            type="number"
+            min={1}
+            max={32}
+            value={bakeSamples}
+            onChange={(event) => setBakeSamples(clamp(Number(event.target.value) || 1, 1, 32))}
+            className="w-full rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-funbox-accent sm:w-28"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-zinc-300">
+          <input
+            type="checkbox"
+            checked={replaceInteriorKeys}
+            onChange={(event) => setReplaceInteriorKeys(event.target.checked)}
+            className="h-4 w-4 accent-funbox-accent"
+          />
+          Recriar intervalo
+        </label>
       </div>
 
       <div className="mt-4 grid gap-3">

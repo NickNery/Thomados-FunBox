@@ -15,11 +15,11 @@ Stack tecnologica:
 
 ## Arquitetura Planejada
 
-O Thomados FunBox sera um painel CEP customizado para Adobe Premiere Pro.
+O Thomados FunBox e um painel CEP customizado para Adobe Premiere Pro.
 
-A interface do painel sera criada em React + TypeScript, empacotada pelo Vite e estilizada com Tailwind CSS. O codigo do front-end ficara em `src/`.
+A interface do painel e criada em React + TypeScript, empacotada pelo Vite e estilizada com Tailwind CSS. O codigo do front-end fica em `src/`.
 
-A comunicacao com o Premiere Pro sera feita pela ponte CEP usando `CSInterface.evalScript`, chamando funcoes ExtendScript expostas em `host/host.jsx`.
+A comunicacao com o Premiere Pro e feita pela ponte CEP usando `CSInterface.evalScript`, chamando funcoes ExtendScript expostas em `host/host.jsx`.
 
 Fluxo planejado:
 
@@ -33,43 +33,49 @@ Fluxo planejado:
 
 ```text
 Thomados-FunBox/
-├── AI-CONTEXT.md
-├── CSXS/
-│   └── manifest.xml
-├── host/
-│   └── host.jsx
-├── scripts/
-│   └── copy-cep-assets.mjs
-├── src/
-│   ├── cep/
-│   │   ├── bridge.ts
-│   │   └── types.d.ts
-│   ├── App.tsx
-│   ├── index.css
-│   └── main.tsx
-├── dist/
-│   └── gerado pelo build
-├── index.html
-├── package.json
-├── postcss.config.cjs
-├── tailwind.config.ts
-├── tsconfig.json
-├── tsconfig.node.json
-└── vite.config.ts
+|-- AI-CONTEXT.md
+|-- CSXS/
+|   `-- manifest.xml
+|-- host/
+|   `-- host.jsx
+|-- scripts/
+|   `-- copy-cep-assets.mjs
+|-- src/
+|   |-- components/
+|   |   `-- BezierCurveEditor.tsx
+|   |-- cep/
+|   |   |-- bridge.ts
+|   |   `-- types.d.ts
+|   |-- App.tsx
+|   |-- index.css
+|   `-- main.tsx
+|-- dist/
+|   `-- gerado pelo build
+|-- index.html
+|-- package.json
+|-- postcss.config.cjs
+|-- tailwind.config.ts
+|-- tsconfig.json
+|-- tsconfig.node.json
+`-- vite.config.ts
 ```
 
 ## Status Atual
 
-Apenas a base inicial do projeto foi criada.
+Editor de Curvas: Concluido.
 
 Itens presentes:
 - Estrutura inicial de painel CEP.
 - Manifest CEP configurado para Premiere Pro.
 - Front-end React + TypeScript + Tailwind CSS.
 - Bridge inicial para chamadas ao host via CSInterface.
-- Script JSX inicial para validar a ponte com o Premiere Pro.
-- Configuracao inicial de Git via `.gitignore`.
+- Componente `BezierCurveEditor.tsx` com SVG interativo para handles de curva cubica.
+- Calculo de Speed e Influence para outgoing e incoming.
+- Presets locais salvos em LocalStorage.
+- Funcao TypeScript para enviar parametros temporais ao host JSX.
+- Script JSX para percorrer clips selecionados, encontrar parametros keyframados e aplicar easing temporal quando suportado.
+- Fallback JSX para interpolacao Bezier nativa via `setInterpolationTypeAtKey()`.
 
-## Próximos Passos
+## Proximos Passos
 
-A proxima tarefa planejada sera implementar o Editor de Velocidade de Keyframes.
+A proxima tarefa planejada sera implementar Animacoes Predefinidas de Textos.

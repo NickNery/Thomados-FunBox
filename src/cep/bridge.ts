@@ -4,6 +4,43 @@ type EvalScriptHost = {
   evalScript: (script: string, callback?: EvalScriptCallback) => void;
 };
 
+export type TemporalEaseValues = {
+  speed: number;
+  influence: number;
+};
+
+export type BezierPoint = {
+  x: number;
+  y: number;
+};
+
+export type TemporalEasePayload = {
+  curve: {
+    outgoing: BezierPoint;
+    incoming: BezierPoint;
+  };
+  ease: {
+    outgoing: TemporalEaseValues;
+    incoming: TemporalEaseValues;
+  };
+  metadata?: {
+    presetName?: string;
+    createdAt?: string;
+  };
+};
+
+export type HostApplyResponse = {
+  ok: boolean;
+  message?: string;
+  applied?: number;
+  clips?: number;
+  components?: number;
+  properties?: number;
+  keys?: number;
+  fallbacks?: number;
+  warnings?: string[];
+};
+
 function getHostBridge(): EvalScriptHost | null {
   if (typeof window === 'undefined') {
     return null;
@@ -42,4 +79,25 @@ export function evalHostScript(script: string): Promise<string> {
       reject(error);
     }
   });
+}
+
+function toExtendScriptLiteral(value: unknown) {
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+export async function applyTemporalEaseToSelection(payload: TemporalEasePayload): Promise<HostApplyResponse> {
+  const script = `thomadosFunBox_applyTemporalEase(${toExtendScriptLiteral(payload)})`;
+  const rawResponse = await evalHostScript(script);
+
+  try {
+    return JSON.parse(rawResponse) as HostApplyResponse;
+  } catch {
+    return {
+      ok: false,
+      message: rawResponse || 'Resposta invalida do host JSX.',
+      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
+    };
+  }
 }

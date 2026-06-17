@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { evalHostScript, isCepRuntime } from './cep/bridge';
+import BezierCurveEditor from './components/BezierCurveEditor';
+import { applyTemporalEaseToSelection, evalHostScript, isCepRuntime } from './cep/bridge';
 
 type PingState = {
   loading: boolean;
@@ -9,6 +10,11 @@ type PingState = {
 
 export default function App() {
   const [ping, setPing] = useState<PingState>({
+    loading: false,
+    output: '',
+    error: ''
+  });
+  const [applyState, setApplyState] = useState<PingState>({
     loading: false,
     output: '',
     error: ''
@@ -28,16 +34,43 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-funbox-background text-zinc-100">
-      <section className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-6 px-5 py-6">
+      <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-5 py-6">
         <header className="border-b border-funbox-line pb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-funbox-accent">
             Premiere Pro CEP Panel
           </p>
           <h1 className="mt-3 text-3xl font-bold">Thomados FunBox</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-300">
-            Base inicial pronta para React, TypeScript, Tailwind CSS e ExtendScript.
+            Editor visual de curvas para speed e influence de keyframes.
           </p>
         </header>
+
+        <BezierCurveEditor
+          isApplying={applyState.loading}
+          onApply={async (payload) => {
+            setApplyState({ loading: true, output: '', error: '' });
+
+            try {
+              const response = await applyTemporalEaseToSelection(payload);
+              const formatted = JSON.stringify(response, null, 2);
+
+              setApplyState({
+                loading: false,
+                output: formatted,
+                error: response.ok ? '' : response.message || formatted
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              setApplyState({ loading: false, output: '', error: message });
+            }
+          }}
+        />
+
+        {(applyState.output || applyState.error) && (
+          <pre className="max-h-56 overflow-auto rounded-md border border-funbox-line bg-black/30 p-3 text-xs leading-5 text-zinc-200">
+            {applyState.error || applyState.output}
+          </pre>
+        )}
 
         <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
           <div className="flex items-start justify-between gap-4">

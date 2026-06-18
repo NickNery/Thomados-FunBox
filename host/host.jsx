@@ -1,15 +1,9 @@
-/* global app, $, Time */
+/* global app, $, File, Time */
 
 (function () {
     var KF_INTERP_MODE_LINEAR = 0;
     var KF_INTERP_MODE_BEZIER = 5;
     var TICKS_PER_SECOND = 254016000000;
-    var TEXT_MOGRTS = {
-        "pop-in": "text-pop-in.mogrt",
-        "slide-up": "text-slide-up.mogrt",
-        "fade-scale": "text-fade-scale.mogrt",
-        "typewriter": "text-typewriter.mogrt"
-    };
 
     function escapeJson(value) {
         if (value === null || value === undefined) {
@@ -90,6 +84,10 @@
 
         if (typeof collection.numItems === "number") {
             return collection.numItems;
+        }
+
+        if (typeof collection.numTracks === "number") {
+            return collection.numTracks;
         }
 
         return 0;
@@ -177,18 +175,88 @@
     }
 
     function normalizeTextAnimationPayload(payload) {
+        var supportedTypes = {
+            "pop-in": true,
+            "slide-up": true,
+            "fade-scale": true,
+            "typewriter": true,
+            "custom": true
+        };
+
         payload = payload || {};
 
-        if (!TEXT_MOGRTS[payload.type]) {
+        if (!supportedTypes[payload.type]) {
             payload.type = "pop-in";
         }
 
         return {
             type: payload.type,
             duration: clamp(numberValue(payload.duration, 1.5), 0.25, 8),
-            text: payload.text ? String(payload.text) : "THOMADOS",
-            videoTrackOffset: Math.round(clamp(numberValue(payload.videoTrackOffset, 0), 0, 32))
+            target: "selection",
+            presetName: payload.presetName ? String(payload.presetName) : String(payload.type),
+            recipe: normalizeTextAnimationRecipe(payload.recipe, payload.type)
         };
+    }
+
+    function defaultTextAnimationRecipe(type) {
+        if (type === "pop-in") {
+            return {
+                scaleStart: 0,
+                scaleOvershoot: 110,
+                opacityStart: 0
+            };
+        }
+
+        if (type === "slide-up") {
+            return {
+                positionYOffset: 120,
+                opacityStart: 0
+            };
+        }
+
+        if (type === "fade-scale") {
+            return {
+                scaleStart: 92,
+                opacityStart: 0
+            };
+        }
+
+        if (type === "typewriter") {
+            return {
+                opacityStart: 0,
+                reveal: true
+            };
+        }
+
+        return {
+            scaleStart: 92,
+            opacityStart: 0
+        };
+    }
+
+    function optionalRecipeNumber(recipe, key, min, max) {
+        if (!recipe || recipe[key] === undefined || recipe[key] === null || recipe[key] === "") {
+            return null;
+        }
+
+        return clamp(numberValue(recipe[key], 0), min, max);
+    }
+
+    function normalizeTextAnimationRecipe(recipe, type) {
+        var source = recipe || defaultTextAnimationRecipe(type);
+        var normalized = {
+            scaleStart: optionalRecipeNumber(source, "scaleStart", 0, 300),
+            scaleOvershoot: optionalRecipeNumber(source, "scaleOvershoot", 0, 300),
+            positionYOffset: optionalRecipeNumber(source, "positionYOffset", -500, 500),
+            opacityStart: optionalRecipeNumber(source, "opacityStart", 0, 100),
+            reveal: source && source.reveal === true
+        };
+
+        if (normalized.scaleStart !== null && normalized.scaleOvershoot === null) {
+            normalized.scaleOvershoot = 100;
+        }
+
+        return normalized;
     }
 
     function cubicValue(start, controlA, controlB, end, progress) {
@@ -261,17 +329,6 @@
         }
 
         return time;
-    }
-
-    function timeToTicksString(time) {
-        var seconds;
-
-        if (time && time.ticks !== undefined) {
-            return String(time.ticks);
-        }
-
-        seconds = timeToSeconds(time);
-        return String(Math.round(seconds * TICKS_PER_SECOND));
     }
 
     function timeOffset(baseTime, secondsOffset) {
@@ -357,27 +414,6 @@
         throw new Error("Parametro sem getValueAtKey/getValueAtTime.");
     }
 
-    function getExtensionRootFolder() {
-        var hostFile = new File($.fileName);
-        return hostFile.parent.parent;
-    }
-
-    function getTextMogrtFile(type) {
-        return new File(getExtensionRootFolder().fsName + "/mogrt/" + TEXT_MOGRTS[type]);
-    }
-
-    function getPlayheadTime(sequence) {
-        if (typeof sequence.getPlayerPosition === "function") {
-            return sequence.getPlayerPosition();
-        }
-
-        if (typeof sequence.getCTI === "function") {
-            return sequence.getCTI();
-        }
-
-        throw new Error("Nao foi possivel localizar o playhead da sequencia.");
-    }
-
     function getPropertyName(property, fallback) {
         try {
             return property.displayName || property.name || fallback;
@@ -457,19 +493,6 @@
         }
 
         return null;
-    }
-
-    function setStaticParamValue(property, value) {
-        if (!property || typeof property.setValue !== "function") {
-            return false;
-        }
-
-        try {
-            property.setValue(value, 1);
-            return true;
-        } catch (error) {
-            return false;
-        }
     }
 
     function enableKeyframes(property) {
@@ -1041,11 +1064,34 @@
         return 100 * factor;
     }
 
+    function recordAnimationKey(property, keyTime, value, label, result) {
+        if (property && setAnimationKey(property, keyTime, value)) {
+            result.applied += 1;
+            pushUnique(result.animatedProperties, label);
+            return true;
+        }
+
+        return false;
+    }
+
+    function getTrackItemStartTime(trackItem, sequence) {
+        if (trackItem && trackItem.start) {
+            return trackItem.start;
+        }
+
+        if (sequence && typeof sequence.getPlayerPosition === "function") {
+            return sequence.getPlayerPosition();
+        }
+
+        return createTimeFromSeconds(0);
+    }
+
     function applyTransformAnimation(trackItem, payload, startTime, result) {
         var scaleParam = findComponentParam(trackItem, ["scale", "escala"]);
         var positionParam = findComponentParam(trackItem, ["position", "posicao", "posição"]);
         var opacityParam = findComponentParam(trackItem, ["opacity", "opacidade"]);
         var revealParam = findMgtParam(trackItem, ["progress", "progresso", "reveal", "typewriter", "typing"]);
+        var recipe = payload.recipe || {};
         var baseScale = currentParamValue(scaleParam, 100);
         var basePosition = currentParamValue(positionParam, [0.5, 0.5]);
         var baseOpacity = currentParamValue(opacityParam, 100);
@@ -1053,70 +1099,50 @@
         var mid;
         var end;
         var late;
-        var animated = result.animatedProperties;
+        var opacityEndTime;
 
         start = startTime;
         mid = timeOffset(startTime, payload.duration * 0.65);
         late = timeOffset(startTime, payload.duration * 0.18);
         end = timeOffset(startTime, payload.duration);
 
-        if (payload.type === "pop-in") {
-            if (scaleParam) {
-                setAnimationKey(scaleParam, start, scaleValue(baseScale, 0));
-                setAnimationKey(scaleParam, mid, scaleValue(baseScale, 1.1));
-                setAnimationKey(scaleParam, end, baseScale);
-                result.applied += 3;
-                pushUnique(animated, "Scale");
+        if (recipe.scaleStart !== null && recipe.scaleStart !== undefined && scaleParam) {
+            recordAnimationKey(scaleParam, start, scaleValue(baseScale, recipe.scaleStart / 100), "Scale", result);
+
+            if (recipe.scaleOvershoot !== null && recipe.scaleOvershoot !== undefined && recipe.scaleOvershoot !== 100) {
+                recordAnimationKey(scaleParam, mid, scaleValue(baseScale, recipe.scaleOvershoot / 100), "Scale", result);
             }
 
-            if (opacityParam) {
-                setAnimationKey(opacityParam, start, 0);
-                setAnimationKey(opacityParam, late, baseOpacity || 100);
-                result.applied += 2;
-                pushUnique(animated, "Opacity");
-            }
-        } else if (payload.type === "slide-up") {
-            if (positionParam) {
-                setAnimationKey(positionParam, start, addPositionOffset(basePosition, 0, 120));
-                setAnimationKey(positionParam, end, basePosition);
-                result.applied += 2;
-                pushUnique(animated, "Position");
-            }
+            recordAnimationKey(scaleParam, end, baseScale, "Scale", result);
+        }
 
-            if (opacityParam) {
-                setAnimationKey(opacityParam, start, 0);
-                setAnimationKey(opacityParam, mid, baseOpacity || 100);
-                result.applied += 2;
-                pushUnique(animated, "Opacity");
-            }
-        } else if (payload.type === "fade-scale") {
-            if (scaleParam) {
-                setAnimationKey(scaleParam, start, scaleValue(baseScale, 0.92));
-                setAnimationKey(scaleParam, end, baseScale);
-                result.applied += 2;
-                pushUnique(animated, "Scale");
-            }
+        if (recipe.positionYOffset !== null && recipe.positionYOffset !== undefined && recipe.positionYOffset !== 0 && positionParam) {
+            recordAnimationKey(positionParam, start, addPositionOffset(basePosition, 0, recipe.positionYOffset), "Position", result);
+            recordAnimationKey(positionParam, end, basePosition, "Position", result);
+        }
 
-            if (opacityParam) {
-                setAnimationKey(opacityParam, start, 0);
-                setAnimationKey(opacityParam, end, baseOpacity || 100);
-                result.applied += 2;
-                pushUnique(animated, "Opacity");
-            }
-        } else if (payload.type === "typewriter") {
+        if (recipe.reveal) {
             if (revealParam) {
-                setAnimationKey(revealParam, start, 0);
-                setAnimationKey(revealParam, end, 100);
-                result.applied += 2;
-                pushUnique(animated, "Reveal");
+                recordAnimationKey(revealParam, start, 0, "Reveal", result);
+                recordAnimationKey(revealParam, end, 100, "Reveal", result);
+            } else if (payload.type === "typewriter" || payload.type === "custom") {
+                result.warnings.push(
+                    "Typewriter real exige um parametro Reveal/Progress exposto no texto selecionado; aplicando fade como fallback."
+                );
+            }
+        }
+
+        if (recipe.opacityStart !== null && recipe.opacityStart !== undefined && opacityParam) {
+            opacityEndTime = end;
+
+            if (payload.type === "pop-in" || payload.type === "typewriter") {
+                opacityEndTime = late;
+            } else if (payload.type === "slide-up") {
+                opacityEndTime = mid;
             }
 
-            if (opacityParam) {
-                setAnimationKey(opacityParam, start, 0);
-                setAnimationKey(opacityParam, late, baseOpacity || 100);
-                result.applied += 2;
-                pushUnique(animated, "Opacity");
-            }
+            recordAnimationKey(opacityParam, start, recipe.opacityStart, "Opacity", result);
+            recordAnimationKey(opacityParam, opacityEndTime, baseOpacity || 100, "Opacity", result);
         }
     }
 
@@ -1128,23 +1154,22 @@
             clips: 0,
             properties: 0,
             animationType: "",
-            mogrtPath: "",
-            trackIndex: 0,
+            target: "selection",
+            presetName: "",
             clipName: "",
             animatedProperties: [],
             warnings: []
         };
         var sequence;
         var textPayload = normalizeTextAnimationPayload(payload);
-        var mogrtFile = getTextMogrtFile(textPayload.type);
-        var playheadTime;
+        var selectedClips;
+        var clipIndex;
         var trackItem;
-        var textParam;
-        var endTime;
+        var startTime;
+        var beforeApplied;
 
         result.animationType = textPayload.type;
-        result.mogrtPath = mogrtFile.fsName;
-        result.trackIndex = textPayload.videoTrackOffset;
+        result.presetName = textPayload.presetName;
 
         try {
             sequence = app.project && app.project.activeSequence;
@@ -1157,58 +1182,223 @@
             return result;
         }
 
-        if (!mogrtFile.exists) {
-            result.message = "Template MOGRT nao encontrado. Coloque o arquivo em: " + mogrtFile.fsName;
-            result.warnings.push("A criacao direta de texto Essential Graphics nao e exposta de forma estavel pela API publica; este modulo usa MOGRT via Sequence.importMGT().");
+        try {
+            selectedClips = sequence.getSelection();
+        } catch (selectionError) {
+            selectedClips = [];
+        }
+
+        selectedClips = collectionToArray(selectedClips);
+
+        if (selectedClips.length === 0) {
+            result.message = "Selecione um texto ou graphic clip na timeline antes de aplicar a animacao.";
+            return result;
+        }
+
+        result.clips = selectedClips.length;
+
+        for (clipIndex = 0; clipIndex < selectedClips.length; clipIndex += 1) {
+            trackItem = selectedClips[clipIndex];
+            startTime = getTrackItemStartTime(trackItem, sequence);
+            beforeApplied = result.applied;
+
+            if (!result.clipName) {
+                result.clipName = trackItem.name || "Texto selecionado";
+            }
+
+            try {
+                applyTransformAnimation(trackItem, textPayload, startTime, result);
+            } catch (animationError) {
+                result.warnings.push(
+                    "Falha ao aplicar animacao em "
+                    + (trackItem.name || "clip selecionado")
+                    + ": "
+                    + animationError
+                );
+            }
+
+            if (beforeApplied === result.applied) {
+                result.warnings.push(
+                    "O item selecionado "
+                    + (trackItem.name || "clip")
+                    + " nao expos Scale, Position, Opacity ou Reveal para keyframes."
+                );
+            }
+        }
+
+        result.properties = result.animatedProperties.length;
+        result.ok = result.applied > 0;
+        result.message = result.applied > 0
+            ? "Animacao aplicada ao texto ou graphic clip selecionado."
+            : "Nenhum parametro animavel foi encontrado nos itens selecionados.";
+
+        if (result.applied === 0) {
+            result.warnings.push("Selecione um texto/graphic clip que exponha Scale, Position, Opacity ou Reveal.");
+        }
+
+        return result;
+    }
+
+    function normalizeFsPath(path) {
+        return String(path || "").replace(/\//g, "\\").toLowerCase();
+    }
+
+    function findProjectItemByPath(projectItem, absoluteFilePath) {
+        var targetPath = normalizeFsPath(absoluteFilePath);
+        var children;
+        var childIndex;
+        var child;
+        var found;
+
+        if (!projectItem) {
+            return null;
+        }
+
+        if (typeof projectItem.getMediaPath === "function") {
+            try {
+                if (normalizeFsPath(projectItem.getMediaPath()) === targetPath) {
+                    return projectItem;
+                }
+            } catch (mediaPathError) {
+                // Bins and offline items may not expose a media path.
+            }
+        }
+
+        children = collectionToArray(projectItem.children);
+
+        for (childIndex = 0; childIndex < children.length; childIndex += 1) {
+            child = children[childIndex];
+            found = findProjectItemByPath(child, absoluteFilePath);
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    function getSequencePlayheadTime(sequence) {
+        if (sequence && typeof sequence.getPlayerPosition === "function") {
+            return sequence.getPlayerPosition();
+        }
+
+        if (sequence && typeof sequence.getCTI === "function") {
+            return sequence.getCTI();
+        }
+
+        throw new Error("Nao foi possivel localizar o CTI da sequencia.");
+    }
+
+    function findAvailableAudioTrack(sequence) {
+        var tracks = sequence && sequence.audioTracks;
+        var length = getCollectionLength(tracks);
+        var index;
+        var track;
+        var locked;
+
+        for (index = 0; index < length; index += 1) {
+            track = getCollectionItem(tracks, index);
+            locked = false;
+
+            if (!track) {
+                continue;
+            }
+
+            try {
+                if (typeof track.isLocked === "function") {
+                    locked = track.isLocked() === true;
+                } else if (typeof track.isLocked === "boolean") {
+                    locked = track.isLocked;
+                }
+            } catch (lockError) {
+                locked = false;
+            }
+
+            if (!locked && typeof track.insertClip === "function") {
+                return {
+                    track: track,
+                    index: index
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function importAndInsertAudio(absoluteFilePath) {
+        var result = {
+            ok: false,
+            message: "",
+            filePath: String(absoluteFilePath || ""),
+            projectItemName: "",
+            audioTrack: -1,
+            imported: false,
+            inserted: false,
+            warnings: []
+        };
+        var sourceFile = new File(result.filePath);
+        var sequence;
+        var projectItem;
+        var importResult;
+        var trackResult;
+        var playheadTime;
+
+        if (!result.filePath || !sourceFile.exists) {
+            result.message = "Arquivo de audio nao encontrado: " + result.filePath;
             return result;
         }
 
         try {
-            playheadTime = getPlayheadTime(sequence);
-            trackItem = sequence.importMGT(mogrtFile.fsName, timeToTicksString(playheadTime), textPayload.videoTrackOffset, 0);
-        } catch (importError) {
-            result.message = "Falha ao importar MOGRT: " + importError;
+            sequence = app.project && app.project.activeSequence;
+        } catch (sequenceError) {
+            sequence = null;
+        }
+
+        if (!sequence) {
+            result.message = "Nenhuma sequencia ativa encontrada.";
             return result;
         }
 
-        if (!trackItem) {
-            result.message = "Premiere nao retornou um item de timeline para o MOGRT importado.";
+        projectItem = findProjectItemByPath(app.project.rootItem, result.filePath);
+
+        if (!projectItem) {
+            try {
+                importResult = app.project.importFiles([result.filePath], true, app.project.rootItem, false);
+                result.imported = importResult === true;
+            } catch (importError) {
+                result.message = "Falha ao importar o audio: " + importError;
+                return result;
+            }
+
+            projectItem = findProjectItemByPath(app.project.rootItem, result.filePath);
+        }
+
+        if (!projectItem) {
+            result.message = "O Premiere importou o arquivo, mas o ProjectItem nao foi localizado.";
+            return result;
+        }
+
+        result.projectItemName = projectItem.name || sourceFile.name;
+        trackResult = findAvailableAudioTrack(sequence);
+
+        if (!trackResult) {
+            result.message = "Nenhuma track de audio desbloqueada foi encontrada na sequencia.";
+            return result;
+        }
+
+        try {
+            playheadTime = getSequencePlayheadTime(sequence);
+            trackResult.track.insertClip(projectItem, playheadTime);
+            result.inserted = true;
+            result.audioTrack = trackResult.index;
+        } catch (insertError) {
+            result.message = "Audio importado, mas falhou ao inserir na timeline: " + insertError;
             return result;
         }
 
         result.ok = true;
-        result.clips = 1;
-        result.clipName = trackItem.name || "Texto animado";
-
-        try {
-            endTime = timeOffset(playheadTime, textPayload.duration + 0.5);
-            trackItem.end = endTime;
-        } catch (durationError) {
-            result.warnings.push("Nao foi possivel ajustar a duracao do texto: " + durationError);
-        }
-
-        textParam = findMgtParam(trackItem, ["source text", "text", "texto"]);
-
-        if (textParam && setStaticParamValue(textParam, textPayload.text)) {
-            result.properties += 1;
-            pushUnique(result.animatedProperties, "Text");
-        }
-
-        try {
-            applyTransformAnimation(trackItem, textPayload, playheadTime, result);
-        } catch (animationError) {
-            result.warnings.push("MOGRT importado, mas houve falha ao aplicar keyframes: " + animationError);
-        }
-
-        result.properties = result.animatedProperties.length;
-        result.message = result.applied > 0
-            ? "Texto animado inserido no playhead e keyframes aplicados."
-            : "Texto inserido no playhead, mas nenhum parametro animavel foi exposto pelo MOGRT.";
-
-        if (result.applied === 0) {
-            result.warnings.push("Exponha Scale, Position, Opacity ou Reveal no MOGRT para que o plugin injete keyframes.");
-        }
-
+        result.message = "Audio importado e inserido no CTI da sequencia.";
         return result;
     }
 
@@ -1241,6 +1431,10 @@
 
         applyTextAnimation: function (payload) {
             return stringifyJson(applyTextAnimation(payload));
+        },
+
+        importAndInsertAudio: function (absoluteFilePath) {
+            return stringifyJson(importAndInsertAudio(absoluteFilePath));
         }
     };
 
@@ -1258,5 +1452,9 @@
 
     $.global.thomadosFunBox_applyTextAnimation = function (payload) {
         return $.global.ThomadosFunBox.applyTextAnimation(payload);
+    };
+
+    $.global.thomadosFunBox_importAndInsertAudio = function (absoluteFilePath) {
+        return $.global.ThomadosFunBox.importAndInsertAudio(absoluteFilePath);
     };
 }());

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AudioLibrary from './components/AudioLibrary';
 import BezierCurveEditor from './components/BezierCurveEditor';
 import TextAnimationGallery from './components/TextAnimationGallery';
 import {
@@ -6,6 +7,7 @@ import {
   applyTextAnimation,
   bakeCurveToSelection,
   evalHostScript,
+  importAndInsertAudio,
   isCepRuntime
 } from './cep/bridge';
 import type { BakeCurvePayload, TemporalEasePayload, TextAnimationPayload } from './cep/bridge';
@@ -16,7 +18,7 @@ type PingState = {
   error: string;
 };
 
-type ApplyMode = 'bezier' | 'bake' | 'text';
+type ApplyMode = 'bezier' | 'bake' | 'text' | 'audio';
 
 type ApplyState = PingState & {
   mode: ApplyMode | null;
@@ -90,6 +92,11 @@ export default function App() {
         <TextAnimationGallery
           isApplying={applyState.loading && applyState.mode === 'text'}
           onApply={(payload: TextAnimationPayload) => runApply('text', () => applyTextAnimation(payload))}
+        />
+
+        <AudioLibrary
+          isInserting={applyState.loading && applyState.mode === 'audio'}
+          onInsert={(absoluteFilePath) => runApply('audio', () => importAndInsertAudio(absoluteFilePath))}
         />
 
         {(applyState.output || applyState.error) && (

@@ -36,13 +36,22 @@ export type BakeCurvePayload = TemporalEasePayload & {
   };
 };
 
-export type TextAnimationType = 'pop-in' | 'slide-up' | 'fade-scale' | 'typewriter';
+export type TextAnimationType = 'pop-in' | 'slide-up' | 'fade-scale' | 'typewriter' | 'custom';
+
+export type TextAnimationRecipe = {
+  scaleStart?: number;
+  scaleOvershoot?: number;
+  positionYOffset?: number;
+  opacityStart?: number;
+  reveal?: boolean;
+};
 
 export type TextAnimationPayload = {
   type: TextAnimationType;
   duration: number;
-  text?: string;
-  videoTrackOffset?: number;
+  target?: 'selection';
+  presetName?: string;
+  recipe?: TextAnimationRecipe;
 };
 
 export type HostApplyResponse = {
@@ -63,10 +72,15 @@ export type HostApplyResponse = {
   unsupportedProperties?: number;
   linearizedKeys?: number;
   animationType?: TextAnimationType;
-  mogrtPath?: string;
-  trackIndex?: number;
+  target?: 'selection';
+  presetName?: string;
   clipName?: string;
   animatedProperties?: string[];
+  filePath?: string;
+  projectItemName?: string;
+  audioTrack?: number;
+  imported?: boolean;
+  inserted?: boolean;
   warnings?: string[];
 };
 
@@ -148,6 +162,21 @@ export async function bakeCurveToSelection(payload: BakeCurvePayload): Promise<H
 
 export async function applyTextAnimation(payload: TextAnimationPayload): Promise<HostApplyResponse> {
   const script = `thomadosFunBox_applyTextAnimation(${toExtendScriptLiteral(payload)})`;
+  const rawResponse = await evalHostScript(script);
+
+  try {
+    return JSON.parse(rawResponse) as HostApplyResponse;
+  } catch {
+    return {
+      ok: false,
+      message: rawResponse || 'Resposta invalida do host JSX.',
+      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
+    };
+  }
+}
+
+export async function importAndInsertAudio(absoluteFilePath: string): Promise<HostApplyResponse> {
+  const script = `thomadosFunBox_importAndInsertAudio(${toExtendScriptLiteral(absoluteFilePath)})`;
   const rawResponse = await evalHostScript(script);
 
   try {

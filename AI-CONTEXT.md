@@ -38,12 +38,16 @@ Thomados-FunBox/
 |   `-- manifest.xml
 |-- host/
 |   `-- host.jsx
-|-- mogrt/
-|   `-- README.md
+|-- public/
+|   `-- assets/
+|       `-- sfx/
+|           |-- soft-whoosh.wav
+|           `-- ui-click.wav
 |-- scripts/
 |   `-- copy-cep-assets.mjs
 |-- src/
 |   |-- components/
+|   |   |-- AudioLibrary.tsx
 |   |   |-- BezierCurveEditor.tsx
 |   |   `-- TextAnimationGallery.tsx
 |   |-- cep/
@@ -67,6 +71,9 @@ Thomados-FunBox/
 
 Editor de Curvas: Concluido.
 Animacoes de Texto: Concluido.
+Biblioteca de Audios: Concluido.
+
+MVP (Minimum Viable Product) das 3 funcionalidades principais foi alcancado.
 
 Itens presentes:
 - Estrutura inicial de painel CEP.
@@ -93,12 +100,22 @@ Experimento adicionado apos esse teste:
 
 Modulo de Animacoes de Texto:
 - Front-end concluido com `TextAnimationGallery.tsx`, exibindo presets em grid: Pop-in, Slide Up, Fade Scale e Typewriter.
-- A galeria envia payloads via bridge CEP para `thomadosFunBox_applyTextAnimation(...)`, incluindo `type`, `duration`, `text` e `videoTrackOffset`.
-- A abordagem escolhida para inserir textos foi hibrida e baseada em MOGRTs, por ser a rota mais estavel exposta pela API publica do Premiere: `Sequence.importMGT(path, time, vidTrackOffset, audTrackOffset)`.
-- O host JSX procura os templates em `mogrt/`: `text-pop-in.mogrt`, `text-slide-up.mogrt`, `text-fade-scale.mogrt` e `text-typewriter.mogrt`.
-- Apos importar o MOGRT no playhead, o JSX tenta aplicar keyframes matematicos em Scale, Position, Opacity e Reveal quando esses parametros estiverem expostos pelo item inserido.
-- Criacao direta de texto Essential Graphics por script puro nao foi usada como caminho principal porque nao aparece como API publica estavel; sem os arquivos `.mogrt`, o host retorna uma mensagem clara com o caminho esperado.
+- A galeria envia payloads via bridge CEP para `thomadosFunBox_applyTextAnimation(...)`, incluindo `type`, `duration` e alvo `selection`.
+- A abordagem atual aplica a animacao no texto ou graphic clip ja selecionado na timeline, sem importar um novo MOGRT.
+- Cada template de animacao e um preset de codigo: uma entrada em `TextAnimationGallery.tsx` e uma receita de keyframes no `applyTransformAnimation()` do `host/host.jsx`.
+- Usuarios podem criar presets proprios dentro do painel no Premiere. Esses presets sao salvos em `localStorage` com nome, duracao, base visual e receita customizada.
+- Presets customizados sao enviados como `type: "custom"` com `recipe`, incluindo parametros como `scaleStart`, `scaleOvershoot`, `positionYOffset`, `opacityStart` e `reveal`.
+- O host usa `sequence.getSelection()` para pegar os itens selecionados e tenta injetar keyframes em Scale, Position, Opacity e Reveal quando esses parametros estiverem expostos pelo clip.
+- O preset Typewriter so faz revelacao real se o texto selecionado expuser um parametro Reveal/Progress; caso contrario, aplica fade como fallback.
+
+Modulo de Biblioteca de Audios:
+- Front-end concluido com `AudioLibrary.tsx`, listando arquivos dinamicamente a partir de `dist/assets/sfx`.
+- O acesso a `fs` e `path` usa `window.cep_node.require` ou `window.require` em runtime CEP, evitando imports Node estaticos que o Vite tentaria externalizar.
+- O preview usa um elemento HTML5 `<audio>` e URLs `file:///` geradas a partir dos caminhos absolutos encontrados no disco.
+- O painel envia o caminho absoluto para `thomadosFunBox_importAndInsertAudio(...)` via bridge CEP.
+- O host JSX usa `app.project.importFiles(...)`, localiza o `ProjectItem`, encontra a primeira track de audio desbloqueada e insere o clip no CTI atual da sequencia.
+- Dois WAVs originais de teste acompanham o projeto: `ui-click.wav` e `soft-whoosh.wav`.
 
 ## Proximos Passos
 
-A proxima e ultima tarefa planejada sera Biblioteca e Preview de Audios.
+As tres funcionalidades principais do MVP estao concluidas. Proximos passos ficam reservados para refinamento, testes praticos e empacotamento.

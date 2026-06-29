@@ -34,19 +34,19 @@ const MAX_HANDLE_X = 0.98;
 const DEFAULT_PRESETS: CurvePreset[] = [
   {
     id: 'smooth-ease',
-    name: 'Smooth Ease',
+    name: 'Suavização',
     outgoing: { x: 0.33, y: 0.1 },
     incoming: { x: 0.67, y: 0.9 }
   },
   {
     id: 'quick-start',
-    name: 'Quick Start',
+    name: 'Início rápido',
     outgoing: { x: 0.18, y: 0.8 },
     incoming: { x: 0.74, y: 0.95 }
   },
   {
     id: 'soft-stop',
-    name: 'Soft Stop',
+    name: 'Parada suave',
     outgoing: { x: 0.32, y: 0.08 },
     incoming: { x: 0.9, y: 0.7 }
   }
@@ -244,8 +244,8 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
     <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold">Editor de Curvas</h2>
-          <p className="mt-1 text-sm text-zinc-400">Speed / Influence</p>
+          <h2 className="text-base font-semibold">Editor de curvas</h2>
+          <p className="mt-1 text-sm text-zinc-400">Velocidade e influência</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <button
@@ -254,7 +254,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
             disabled={isBusy}
             className="rounded-md border border-funbox-line px-3 py-2 text-sm font-semibold text-zinc-100 transition hover:border-funbox-accent disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isApplying ? 'Aplicando...' : 'Aplicar Bezier'}
+            {isApplying ? 'Aplicando...' : 'Aplicar Bézier'}
           </button>
           <button
             type="button"
@@ -262,7 +262,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
             disabled={isBusy}
             className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isBaking ? 'Gerando...' : 'Bake Curve'}
+            {isBaking ? 'Gerando...' : 'Gerar keyframes'}
           </button>
         </div>
       </div>
@@ -271,7 +271,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label="Editor visual de curva Bezier"
+        aria-label="Editor visual de curva Bézier"
         className="mt-4 aspect-[18/13] w-full select-none rounded-md border border-funbox-line bg-[#0c0d10]"
         onPointerMove={handlePointerMove}
         onPointerUp={() => setActiveHandle(null)}
@@ -313,29 +313,29 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
           }}
         />
         <text x={PAD} y={HEIGHT - 9} fill="#9ca3af" fontSize="10">
-          Out
+          Saída
         </text>
-        <text x={WIDTH - PAD - 12} y={PAD - 12} fill="#9ca3af" fontSize="10">
-          In
+        <text x={WIDTH - PAD - 38} y={PAD - 12} fill="#9ca3af" fontSize="10">
+          Entrada
         </text>
       </svg>
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-md border border-funbox-line bg-black/20 p-3">
-          <p className="font-semibold text-amber-300">Outgoing</p>
-          <p className="mt-1 text-zinc-300">Speed {ease.outgoing.speed}</p>
-          <p className="text-zinc-300">Influence {ease.outgoing.influence}%</p>
+          <p className="font-semibold text-amber-300">Saída</p>
+          <p className="mt-1 text-zinc-300">Velocidade {ease.outgoing.speed}</p>
+          <p className="text-zinc-300">Influência {ease.outgoing.influence}%</p>
         </div>
         <div className="rounded-md border border-funbox-line bg-black/20 p-3">
-          <p className="font-semibold text-sky-300">Incoming</p>
-          <p className="mt-1 text-zinc-300">Speed {ease.incoming.speed}</p>
-          <p className="text-zinc-300">Influence {ease.incoming.influence}%</p>
+          <p className="font-semibold text-sky-300">Entrada</p>
+          <p className="mt-1 text-zinc-300">Velocidade {ease.incoming.speed}</p>
+          <p className="text-zinc-300">Influência {ease.incoming.influence}%</p>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 rounded-md border border-funbox-line bg-black/20 p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
         <label className="grid gap-1 text-zinc-300">
-          <span className="font-semibold text-zinc-100">Amostras do bake</span>
+          <span className="font-semibold text-zinc-100">Amostras da curva</span>
           <input
             type="number"
             min={1}

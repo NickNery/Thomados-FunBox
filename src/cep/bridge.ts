@@ -36,22 +36,41 @@ export type BakeCurvePayload = TemporalEasePayload & {
   };
 };
 
-export type TextAnimationType = 'pop-in' | 'slide-up' | 'fade-scale' | 'typewriter' | 'custom';
-
-export type TextAnimationRecipe = {
-  scaleStart?: number;
-  scaleOvershoot?: number;
-  positionYOffset?: number;
-  opacityStart?: number;
-  reveal?: boolean;
+export type CapturedKeyframe = {
+  offsetSeconds: number;
+  value: unknown;
+  interpolationType?: number | null;
 };
 
-export type TextAnimationPayload = {
-  type: TextAnimationType;
-  duration: number;
-  target?: 'selection';
-  presetName?: string;
-  recipe?: TextAnimationRecipe;
+export type CapturedAnimationProperty = {
+  componentMatchName: string;
+  componentDisplayName: string;
+  componentIndex: number;
+  propertyDisplayName: string;
+  propertyIndex: number;
+  keyframes: CapturedKeyframe[];
+};
+
+export type CapturedTextAnimation = {
+  sourceClipName: string;
+  durationSeconds: number;
+  properties: CapturedAnimationProperty[];
+};
+
+export type CapturedTextAnimationPreset = {
+  id: string;
+  name: string;
+  createdAt: string;
+  animation: CapturedTextAnimation;
+};
+
+export type CaptureTextAnimationResponse = HostApplyResponse & {
+  animation?: CapturedTextAnimation;
+};
+
+export type ApplyCapturedTextAnimationPayload = {
+  presetName: string;
+  animation: CapturedTextAnimation;
 };
 
 export type HostApplyResponse = {
@@ -71,7 +90,6 @@ export type HostApplyResponse = {
   removedKeys?: number;
   unsupportedProperties?: number;
   linearizedKeys?: number;
-  animationType?: TextAnimationType;
   target?: 'selection';
   presetName?: string;
   clipName?: string;
@@ -118,7 +136,7 @@ export function evalHostScript(script: string): Promise<string> {
     return Promise.resolve(
       JSON.stringify({
         ok: false,
-        message: 'CEP indisponivel fora do Premiere Pro. Use o painel instalado para testar host.jsx.',
+        message: 'CEP indisponível fora do Premiere Pro. Use o painel instalado para testar o host.jsx.',
         script
       })
     );
@@ -126,7 +144,7 @@ export function evalHostScript(script: string): Promise<string> {
 
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
-      reject(new Error('O Premiere nao respondeu ao comando JSX em 15 segundos.'));
+      reject(new Error('O Premiere não respondeu ao comando JSX em 15 segundos.'));
     }, 15000);
 
     try {
@@ -134,7 +152,7 @@ export function evalHostScript(script: string): Promise<string> {
         window.clearTimeout(timeout);
 
         if (!result || result === 'EvalScript error.') {
-          reject(new Error('O host JSX retornou EvalScript error. Verifique a instalacao e o host.jsx.'));
+          reject(new Error('O host JSX retornou EvalScript error. Verifique a instalação e o host.jsx.'));
           return;
         }
 
@@ -160,7 +178,7 @@ async function invokeHost<T>(functionName: string, payload?: unknown): Promise<T
   try {
     return JSON.parse(rawResponse) as T;
   } catch {
-    throw new Error(`Resposta invalida de ${functionName}: ${rawResponse}`);
+    throw new Error(`Resposta inválida de ${functionName}: ${rawResponse}`);
   }
 }
 
@@ -181,8 +199,14 @@ export async function bakeCurveToSelection(payload: BakeCurvePayload): Promise<H
   return invokeHost<HostApplyResponse>('thomadosFunBox_bakeCurve', payload);
 }
 
-export async function applyTextAnimation(payload: TextAnimationPayload): Promise<HostApplyResponse> {
-  return invokeHost<HostApplyResponse>('thomadosFunBox_applyTextAnimation', payload);
+export async function captureTextAnimationFromSelection(): Promise<CaptureTextAnimationResponse> {
+  return invokeHost<CaptureTextAnimationResponse>('thomadosFunBox_captureTextAnimation');
+}
+
+export async function applyCapturedTextAnimation(
+  payload: ApplyCapturedTextAnimationPayload
+): Promise<HostApplyResponse> {
+  return invokeHost<HostApplyResponse>('thomadosFunBox_applyCapturedTextAnimation', payload);
 }
 
 export async function importAndInsertAudio(absoluteFilePath: string): Promise<HostApplyResponse> {

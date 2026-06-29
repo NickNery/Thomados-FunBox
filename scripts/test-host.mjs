@@ -75,6 +75,7 @@ function makeParam(displayName, initialValue, initialKeys = [new MockTime(1), ne
       }
       return 0;
     },
+    getInterpolationTypeAtKey: () => 5,
     setInterpolationTypeAtKey: () => 0,
     removeKey: (time) => {
       const index = values.indexOf(findValue(time));
@@ -177,13 +178,17 @@ const bake = parse(api.thomadosFunBox_bakeCurve({
 assert.equal(bake.ok, true);
 assert.ok(bake.bakedKeys > 0);
 
-const textAnimation = parse(api.thomadosFunBox_applyTextAnimation({
-  type: 'slide-up',
-  duration: 1,
-  recipe: { positionYOffset: 120, opacityStart: 0 }
+const capturedAnimation = parse(api.thomadosFunBox_captureTextAnimation());
+assert.equal(capturedAnimation.ok, true);
+assert.ok(capturedAnimation.animation.properties.length > 0);
+assert.ok(capturedAnimation.keys > 0);
+
+const appliedAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
+  presetName: 'Teste capturado',
+  animation: capturedAnimation.animation
 }));
-assert.equal(textAnimation.ok, true);
-assert.ok(textAnimation.applied > 0);
+assert.equal(appliedAnimation.ok, true);
+assert.ok(appliedAnimation.applied > 0);
 
 const audio = parse(api.thomadosFunBox_importAndInsertAudio('C:\\audio\\ui-click.wav'));
 assert.equal(audio.ok, true);

@@ -19,6 +19,11 @@
             .replace(/\t/g, "\\t");
     }
 
+    function isArrayValue(value) {
+        return value instanceof Array
+            || (value && typeof value.length === "number" && typeof value.push === "function");
+    }
+
     function stringifyJson(value) {
         var index;
         var items;
@@ -40,7 +45,7 @@
             return "\"" + escapeJson(value) + "\"";
         }
 
-        if (value instanceof Array) {
+        if (isArrayValue(value)) {
             items = [];
 
             for (index = 0; index < value.length; index += 1) {
@@ -415,7 +420,7 @@
         }
 
         if (typeof property.setValueAtKey !== "function") {
-            throw new Error("Parametro sem setValueAtKey.");
+            throw new Error("Parâmetro sem setValueAtKey.");
         }
 
         property.setValueAtKey(keyTime, value, 1);
@@ -434,7 +439,7 @@
             return property.getValueAtTime(keyTime);
         }
 
-        throw new Error("Parametro sem getValueAtKey/getValueAtTime.");
+        throw new Error("Parâmetro sem getValueAtKey/getValueAtTime.");
     }
 
     function getPropertyName(property, fallback) {
@@ -736,7 +741,7 @@
         }
 
         if (!temporalApplied && !interpolationApplied) {
-            throw new Error("Parametro sem metodo de interpolacao temporal disponivel.");
+            throw new Error("Parâmetro sem método de interpolação temporal disponível.");
         }
 
         return {
@@ -789,7 +794,7 @@
         }
 
         if (!sequence) {
-            result.message = "Nenhuma sequencia ativa encontrada.";
+            result.message = "Nenhuma sequência ativa foi encontrada.";
             return result;
         }
 
@@ -802,7 +807,7 @@
         selectedClips = collectionToArray(selectedClips);
 
         if (selectedClips.length === 0) {
-            result.message = "Nenhum clip selecionado na timeline.";
+            result.message = "Nenhum clipe foi selecionado na timeline.";
             return result;
         }
 
@@ -837,15 +842,15 @@
                             if (targetKeys.source === "all-no-selection-api") {
                                 result.selectionLimitedProperties += 1;
                                 result.warnings.push(
-                                    "A API publica do Premiere nao expoe selecao individual de keyframes para "
+                                    "A API pública do Premiere não expõe a seleção individual de keyframes para "
                                     + propertyName
-                                    + "; aplicando em todos os keyframes do parametro."
+                                    + "; aplicando a todos os keyframes do parâmetro."
                                 );
                             } else {
                                 result.warnings.push(
                                     "Nenhum keyframe selecionado foi detectado em "
                                     + propertyName
-                                    + "; aplicando em todos os keyframes do parametro."
+                                    + "; aplicando a todos os keyframes do parâmetro."
                                 );
                             }
                         }
@@ -884,16 +889,16 @@
 
         result.ok = result.applied > 0;
         if (result.ok && result.temporalEaseApplied === 0) {
-            result.message = "Interpolacao Bezier aplicada aos keyframes encontrados. Speed/Influence numerico nao foi alterado porque a API do Premiere nao expos esse ajuste para estes parametros.";
+            result.message = "Interpolação Bézier aplicada aos keyframes encontrados. Os valores numéricos de velocidade e influência não foram alterados porque a API do Premiere não expõe esse ajuste para esses parâmetros.";
         } else {
             result.message = result.ok
-                ? "Ease temporal aplicado aos keyframes encontrados."
-                : "Nenhum parametro keyframado foi encontrado nos clips selecionados.";
+                ? "Suavização temporal aplicada aos keyframes encontrados."
+                : "Nenhum parâmetro com keyframes foi encontrado nos clipes selecionados.";
         }
 
         if (result.fallbacks > 0) {
             result.warnings.push(
-                "Premiere Pro nao disponibilizou setTemporalEaseAtKey para todos os parametros; foi aplicada interpolacao Bezier quando possivel."
+                "O Premiere Pro não disponibilizou setTemporalEaseAtKey para todos os parâmetros; a interpolação Bézier foi aplicada quando possível."
             );
         }
 
@@ -958,7 +963,7 @@
         }
 
         if (!sequence) {
-            result.message = "Nenhuma sequencia ativa encontrada.";
+            result.message = "Nenhuma sequência ativa foi encontrada.";
             return result;
         }
 
@@ -971,7 +976,7 @@
         selectedClips = collectionToArray(selectedClips);
 
         if (selectedClips.length === 0) {
-            result.message = "Nenhum clip selecionado na timeline.";
+            result.message = "Nenhum clipe foi selecionado na timeline.";
             return result;
         }
 
@@ -1005,22 +1010,22 @@
                         if (targetKeys.source === "all-no-selection-api") {
                             result.selectionLimitedProperties += 1;
                             result.warnings.push(
-                                "A API publica do Premiere nao expoe selecao individual de keyframes para "
+                                "A API pública do Premiere não expõe a seleção individual de keyframes para "
                                 + propertyName
-                                + "; o bake usara o primeiro e o ultimo keyframe do parametro."
+                                + "; a curva usará o primeiro e o último keyframe do parâmetro."
                             );
                         } else if (targetKeys.source === "all-no-selected-keys") {
                             result.warnings.push(
                                 "Nenhum keyframe selecionado foi detectado em "
                                 + propertyName
-                                + "; o bake usara o primeiro e o ultimo keyframe do parametro."
+                                + "; a curva usará o primeiro e o último keyframe do parâmetro."
                             );
                         }
 
                         if (keys.length > 2 && !bake.replaceInteriorKeys) {
                             result.unsupportedProperties += 1;
                             result.warnings.push(
-                                "Bake ignorado em "
+                                "Curva ignorada em "
                                 + propertyName
                                 + " porque existem keyframes internos. Ative Recriar intervalo para substituir esses keyframes."
                             );
@@ -1035,7 +1040,7 @@
 
                         if (!isFinite(startSeconds) || !isFinite(endSeconds) || duration <= 0) {
                             result.unsupportedProperties += 1;
-                            result.warnings.push("Bake ignorado em " + propertyName + " por tempos de keyframe invalidos.");
+                            result.warnings.push("Curva ignorada em " + propertyName + " por conter tempos de keyframe inválidos.");
                             continue;
                         }
 
@@ -1045,9 +1050,9 @@
                         if (interpolateValue(startValue, endValue, 0.5) === null) {
                             result.unsupportedProperties += 1;
                             result.warnings.push(
-                                "Bake ignorado em "
+                                "Curva ignorada em "
                                 + propertyName
-                                + " porque os valores nao sao numericos ou vetores numericos compativeis."
+                                + " porque os valores não são numéricos nem vetores numéricos compatíveis."
                             );
                             continue;
                         }
@@ -1063,7 +1068,7 @@
                                         result.removedKeys += 1;
                                     } catch (removeError) {
                                         result.warnings.push(
-                                            "Nao foi possivel remover keyframe interno em "
+                                            "Não foi possível remover o keyframe interno em "
                                             + propertyName
                                             + ": "
                                             + removeError
@@ -1112,12 +1117,12 @@
 
         result.ok = result.bakedKeys > 0;
         result.message = result.ok
-            ? "Bake Curve gerou keyframes intermediarios seguindo a curva desenhada."
-            : "Nenhum parametro compativel foi encontrado para Bake Curve.";
+            ? "A curva gerou keyframes intermediários seguindo o desenho definido."
+            : "Nenhum parâmetro compatível foi encontrado para gerar a curva.";
 
         if (result.ok) {
             result.warnings.push(
-                "Bake Curve e uma simulacao: ele cria keyframes lineares intermediarios entre o primeiro e o ultimo keyframe."
+                "A geração da curva cria keyframes lineares intermediários entre o primeiro e o último keyframe."
             );
         }
 
@@ -1190,6 +1195,346 @@
         return isFinite(duration) && duration > 0 ? duration : 0;
     }
 
+    function getComponentString(component, key, fallback) {
+        try {
+            return component && component[key] ? String(component[key]) : fallback;
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+    function getInterpolationType(property, keyTime) {
+        var interpolation;
+
+        if (typeof property.getInterpolationTypeAtKey !== "function") {
+            return null;
+        }
+
+        try {
+            interpolation = Number(property.getInterpolationTypeAtKey(keyTime));
+            return isFinite(interpolation) ? interpolation : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function getCaptureTrackItem(selection) {
+        var index;
+        var item;
+
+        for (index = 0; index < selection.length; index += 1) {
+            item = selection[index];
+
+            try {
+                if (Number(item.type) === 1) {
+                    return item;
+                }
+            } catch (error) {
+                // Continue and use the first selected item as a fallback.
+            }
+        }
+
+        return selection.length > 0 ? selection[0] : null;
+    }
+
+    function captureTextAnimation() {
+        var result = {
+            ok: false,
+            message: "",
+            clips: 0,
+            components: 0,
+            properties: 0,
+            keys: 0,
+            clipName: "",
+            animation: null,
+            warnings: []
+        };
+        var sequence;
+        var selection;
+        var trackItem;
+        var clipStartSeconds;
+        var clipDuration;
+        var components;
+        var componentIndex;
+        var component;
+        var properties;
+        var propertyIndex;
+        var property;
+        var keys;
+        var sortedKeys;
+        var keyIndex;
+        var keyTime;
+        var keySeconds;
+        var firstKeySeconds;
+        var lastKeySeconds;
+        var sequenceRelative;
+        var offsetSeconds;
+        var capturedKeyframes;
+        var capturedProperties = [];
+        var maxOffset = 0;
+
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige o Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
+
+        sequence = app.project && app.project.activeSequence;
+
+        if (!sequence) {
+            result.message = "Nenhuma sequência ativa foi encontrada.";
+            return result;
+        }
+
+        selection = collectionToArray(sequence.getSelection());
+        result.clips = selection.length;
+        trackItem = getCaptureTrackItem(selection);
+
+        if (!trackItem) {
+            result.message = "Selecione o clipe de texto ou gráfico que contém a animação.";
+            return result;
+        }
+
+        result.clipName = trackItem.name || "Clipe selecionado";
+        clipStartSeconds = timeToSeconds(trackItem.start);
+        clipDuration = getTrackItemDurationSeconds(trackItem);
+        components = collectionToArray(trackItem.components);
+
+        for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
+            component = components[componentIndex];
+            properties = collectionToArray(component.properties);
+            result.components += 1;
+
+            for (propertyIndex = 0; propertyIndex < properties.length; propertyIndex += 1) {
+                property = properties[propertyIndex];
+
+                try {
+                    keys = typeof property.getKeys === "function" ? property.getKeys() : 0;
+                    sortedKeys = sortKeysByTime(collectionToArray(keys));
+
+                    if (sortedKeys.length === 0) {
+                        continue;
+                    }
+
+                    firstKeySeconds = timeToSeconds(sortedKeys[0]);
+                    lastKeySeconds = timeToSeconds(sortedKeys[sortedKeys.length - 1]);
+                    sequenceRelative = firstKeySeconds >= clipStartSeconds - 0.05
+                        && (clipDuration <= 0 || lastKeySeconds <= clipStartSeconds + clipDuration + 0.05);
+                    capturedKeyframes = [];
+
+                    for (keyIndex = 0; keyIndex < sortedKeys.length; keyIndex += 1) {
+                        keyTime = sortedKeys[keyIndex];
+                        keySeconds = timeToSeconds(keyTime);
+                        offsetSeconds = sequenceRelative ? keySeconds - clipStartSeconds : keySeconds;
+
+                        if (!isFinite(offsetSeconds) || offsetSeconds < -0.05) {
+                            continue;
+                        }
+
+                        offsetSeconds = Math.max(0, offsetSeconds);
+                        capturedKeyframes.push({
+                            offsetSeconds: offsetSeconds,
+                            value: getValueAtKeyTime(property, keyTime),
+                            interpolationType: getInterpolationType(property, keyTime)
+                        });
+                        maxOffset = Math.max(maxOffset, offsetSeconds);
+                        result.keys += 1;
+                    }
+
+                    if (capturedKeyframes.length > 0) {
+                        capturedProperties.push({
+                            componentMatchName: getComponentString(component, "matchName", ""),
+                            componentDisplayName: getComponentString(component, "displayName", "Componente"),
+                            componentIndex: componentIndex,
+                            propertyDisplayName: getPropertyName(property, "Parâmetro"),
+                            propertyIndex: propertyIndex,
+                            keyframes: capturedKeyframes
+                        });
+                        result.properties += 1;
+                    }
+                } catch (propertyError) {
+                    result.warnings.push(
+                        "Não foi possível capturar "
+                        + getPropertyName(property, "um parâmetro")
+                        + ": "
+                        + propertyError
+                    );
+                }
+            }
+        }
+
+        if (capturedProperties.length === 0) {
+            result.message = "Nenhum keyframe foi encontrado no clipe selecionado.";
+            return result;
+        }
+
+        result.animation = {
+            sourceClipName: result.clipName,
+            durationSeconds: maxOffset,
+            properties: capturedProperties
+        };
+        result.ok = true;
+        result.message = "Animação capturada com sucesso.";
+
+        if (selection.length > 1) {
+            result.warnings.push("Mais de um item estava selecionado; apenas o primeiro clipe de vídeo foi capturado.");
+        }
+
+        return result;
+    }
+
+    function findCapturedComponent(trackItem, capturedProperty) {
+        var components = collectionToArray(trackItem.components);
+        var targetMatchName = normalizeIdentifier(capturedProperty.componentMatchName);
+        var targetDisplayName = normalizeIdentifier(capturedProperty.componentDisplayName);
+        var index;
+        var component;
+
+        for (index = 0; index < components.length; index += 1) {
+            component = components[index];
+
+            if (targetMatchName && normalizeIdentifier(getComponentString(component, "matchName", "")) === targetMatchName) {
+                return component;
+            }
+        }
+
+        for (index = 0; index < components.length; index += 1) {
+            component = components[index];
+
+            if (targetDisplayName && normalizeIdentifier(getComponentString(component, "displayName", "")) === targetDisplayName) {
+                return component;
+            }
+        }
+
+        return getCollectionItem(components, Number(capturedProperty.componentIndex));
+    }
+
+    function findCapturedProperty(component, capturedProperty) {
+        var properties = collectionToArray(component && component.properties);
+        var targetName = normalizeIdentifier(capturedProperty.propertyDisplayName);
+        var index;
+
+        for (index = 0; index < properties.length; index += 1) {
+            if (normalizeIdentifier(getPropertyName(properties[index], "")) === targetName) {
+                return properties[index];
+            }
+        }
+
+        return getCollectionItem(properties, Number(capturedProperty.propertyIndex));
+    }
+
+    function applyCapturedTextAnimation(payload) {
+        var result = {
+            ok: false,
+            message: "",
+            applied: 0,
+            clips: 0,
+            properties: 0,
+            keys: 0,
+            presetName: payload && payload.presetName ? String(payload.presetName) : "Preset",
+            animatedProperties: [],
+            warnings: []
+        };
+        var animation = payload && payload.animation;
+        var sequence;
+        var selection;
+        var clipIndex;
+        var trackItem;
+        var clipStart;
+        var clipDuration;
+        var propertyIndex;
+        var capturedProperty;
+        var component;
+        var property;
+        var keyIndex;
+        var capturedKey;
+        var targetTime;
+
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige o Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
+
+        if (!animation || !(animation.properties instanceof Array) || animation.properties.length === 0) {
+            result.message = "O preset não contém keyframes válidos.";
+            return result;
+        }
+
+        sequence = app.project && app.project.activeSequence;
+
+        if (!sequence) {
+            result.message = "Nenhuma sequência ativa foi encontrada.";
+            return result;
+        }
+
+        selection = collectionToArray(sequence.getSelection());
+        result.clips = selection.length;
+
+        if (selection.length === 0) {
+            result.message = "Selecione um clipe de texto ou gráfico para aplicar o preset.";
+            return result;
+        }
+
+        for (clipIndex = 0; clipIndex < selection.length; clipIndex += 1) {
+            trackItem = selection[clipIndex];
+            clipStart = getTrackItemStartTime(trackItem, sequence);
+            clipDuration = getTrackItemDurationSeconds(trackItem);
+
+            for (propertyIndex = 0; propertyIndex < animation.properties.length; propertyIndex += 1) {
+                capturedProperty = animation.properties[propertyIndex];
+                component = findCapturedComponent(trackItem, capturedProperty);
+                property = findCapturedProperty(component, capturedProperty);
+
+                if (!property) {
+                    result.warnings.push(
+                        "O parâmetro "
+                        + capturedProperty.propertyDisplayName
+                        + " não existe em "
+                        + (trackItem.name || "um clipe selecionado")
+                        + "."
+                    );
+                    continue;
+                }
+
+                if (!enableKeyframes(property)) {
+                    result.warnings.push("O parâmetro " + capturedProperty.propertyDisplayName + " não aceita keyframes.");
+                    continue;
+                }
+
+                for (keyIndex = 0; keyIndex < capturedProperty.keyframes.length; keyIndex += 1) {
+                    capturedKey = capturedProperty.keyframes[keyIndex];
+
+                    if (clipDuration > 0 && Number(capturedKey.offsetSeconds) > clipDuration + 0.001) {
+                        result.warnings.push(
+                            "Um keyframe de "
+                            + capturedProperty.propertyDisplayName
+                            + " foi ignorado porque ultrapassa a duração do clipe."
+                        );
+                        continue;
+                    }
+
+                    targetTime = timeOffset(clipStart, Math.max(0, numberValue(capturedKey.offsetSeconds, 0)));
+                    setAnimationKey(property, targetTime, capturedKey.value);
+
+                    if (capturedKey.interpolationType !== null && capturedKey.interpolationType !== undefined) {
+                        setInterpolationMode(property, targetTime, Number(capturedKey.interpolationType));
+                    }
+
+                    result.applied += 1;
+                    result.keys += 1;
+                }
+
+                result.properties += 1;
+                pushUnique(result.animatedProperties, capturedProperty.propertyDisplayName);
+            }
+        }
+
+        result.ok = result.applied > 0;
+        result.message = result.ok
+            ? "Preset aplicado aos clipes selecionados."
+            : "Nenhum keyframe do preset pôde ser aplicado.";
+        return result;
+    }
+
     function applyTransformAnimation(trackItem, sequence, payload, startTime, result) {
         var scaleParam = findComponentParam(trackItem, ["scale", "escala"], ["ae adbe motion", "motion", "movimento"]);
         var positionParam = findComponentParam(trackItem, ["position", "posicao"], ["ae adbe motion", "motion", "movimento"]);
@@ -1233,7 +1578,7 @@
                 recordAnimationKey(revealParam, end, 100, "Reveal", result);
             } else if (payload.type === "typewriter" || payload.type === "custom") {
                 result.warnings.push(
-                    "Typewriter real exige um parametro Reveal/Progress exposto no texto selecionado; aplicando fade como fallback."
+                    "O efeito de digitação exige um parâmetro Reveal/Progress exposto no texto selecionado; um fade será usado como alternativa."
                 );
             }
         }
@@ -1289,7 +1634,7 @@
         }
 
         if (!sequence) {
-            result.message = "Nenhuma sequencia ativa encontrada.";
+            result.message = "Nenhuma sequência ativa foi encontrada.";
             return result;
         }
 
@@ -1302,7 +1647,7 @@
         selectedClips = collectionToArray(selectedClips);
 
         if (selectedClips.length === 0) {
-            result.message = "Selecione um texto ou graphic clip na timeline antes de aplicar a animacao.";
+            result.message = "Selecione um clipe de texto ou gráfico na timeline antes de aplicar a animação.";
             return result;
         }
 
@@ -1321,8 +1666,8 @@
                 applyTransformAnimation(trackItem, sequence, textPayload, startTime, result);
             } catch (animationError) {
                 result.warnings.push(
-                    "Falha ao aplicar animacao em "
-                    + (trackItem.name || "clip selecionado")
+                    "Falha ao aplicar a animação em "
+                    + (trackItem.name || "clipe selecionado")
                     + ": "
                     + animationError
                 );
@@ -1332,7 +1677,7 @@
                 result.warnings.push(
                     "O item selecionado "
                     + (trackItem.name || "clip")
-                    + " nao expos Scale, Position, Opacity ou Reveal para keyframes."
+                    + " não expôs os parâmetros Escala, Posição, Opacidade ou Reveal para keyframes."
                 );
             }
         }
@@ -1340,11 +1685,11 @@
         result.properties = result.animatedProperties.length;
         result.ok = result.applied > 0;
         result.message = result.applied > 0
-            ? "Animacao aplicada ao texto ou graphic clip selecionado."
-            : "Nenhum parametro animavel foi encontrado nos itens selecionados.";
+            ? "Animação aplicada ao clipe de texto ou gráfico selecionado."
+            : "Nenhum parâmetro animável foi encontrado nos itens selecionados.";
 
         if (result.applied === 0) {
-            result.warnings.push("Selecione um texto/graphic clip que exponha Scale, Position, Opacity ou Reveal.");
+            result.warnings.push("Selecione um clipe de texto ou gráfico que exponha Escala, Posição, Opacidade ou Revelação.");
         }
 
         return result;
@@ -1398,7 +1743,7 @@
             return sequence.getCTI();
         }
 
-        throw new Error("Nao foi possivel localizar o CTI da sequencia.");
+        throw new Error("Não foi possível localizar o CTI da sequência.");
     }
 
     function findAvailableAudioTrack(sequence) {
@@ -1447,7 +1792,7 @@
         seconds = timeToSeconds(time);
 
         if (!isFinite(seconds)) {
-            throw new Error("Tempo invalido para insercao de audio.");
+            throw new Error("Tempo inválido para a inserção do áudio.");
         }
 
         return String(Math.round(seconds * TICKS_PER_SECOND));
@@ -1499,7 +1844,7 @@
         }
 
         if (!result.filePath || !sourceFile.exists) {
-            result.message = "Arquivo de audio nao encontrado: " + result.filePath;
+            result.message = "Arquivo de áudio não encontrado: " + result.filePath;
             return result;
         }
 
@@ -1510,7 +1855,7 @@
         }
 
         if (!sequence) {
-            result.message = "Nenhuma sequencia ativa encontrada.";
+            result.message = "Nenhuma sequência ativa foi encontrada.";
             return result;
         }
 
@@ -1522,7 +1867,7 @@
                 importResult = app.project.importFiles([sourceFile.fsName], true, app.project.rootItem, false);
                 result.imported = importResult === true;
             } catch (importError) {
-                result.message = "Falha ao importar o audio: " + importError;
+                result.message = "Falha ao importar o áudio: " + importError;
                 return result;
             }
 
@@ -1530,7 +1875,7 @@
         }
 
         if (!projectItem) {
-            result.message = "O Premiere importou o arquivo, mas o ProjectItem nao foi localizado.";
+            result.message = "O Premiere importou o arquivo, mas o item de projeto não foi localizado.";
             return result;
         }
 
@@ -1538,7 +1883,7 @@
         trackResult = findAvailableAudioTrack(sequence);
 
         if (!trackResult) {
-            result.message = "Nenhuma track de audio desbloqueada foi encontrada na sequencia.";
+            result.message = "Nenhuma faixa de áudio desbloqueada foi encontrada na sequência.";
             return result;
         }
 
@@ -1548,15 +1893,15 @@
             result.audioTrack = trackResult.index;
 
             if (!result.inserted) {
-                throw new Error("O Premiere recusou a insercao na faixa de audio.");
+                throw new Error("O Premiere recusou a inserção na faixa de áudio.");
             }
         } catch (insertError) {
-            result.message = "Audio importado, mas falhou ao inserir na timeline: " + insertError;
+            result.message = "Áudio importado, mas houve uma falha ao inseri-lo na timeline: " + insertError;
             return result;
         }
 
         result.ok = true;
-        result.message = "Audio importado e inserido no CTI da sequencia.";
+        result.message = "Áudio importado e inserido no CTI da sequência.";
         return result;
     }
 
@@ -1602,7 +1947,7 @@
             selectedClips: selection.length,
             message: isExpectedPremiereVersion()
                 ? "Runtime Premiere Pro 26.2.2 validado."
-                : "Versao incompativel do Premiere Pro.",
+                : "Versão incompatível do Premiere Pro.",
             warnings: []
         };
     }
@@ -1640,6 +1985,16 @@
             });
         },
 
+        captureTextAnimation: function () {
+            return safeJsonCall(captureTextAnimation);
+        },
+
+        applyCapturedTextAnimation: function (payload) {
+            return safeJsonCall(function () {
+                return applyCapturedTextAnimation(payload);
+            });
+        },
+
         applyTextAnimation: function (payload) {
             return safeJsonCall(function () {
                 return applyTextAnimation(payload);
@@ -1667,6 +2022,14 @@
 
     $.global.thomadosFunBox_bakeCurve = function (payload) {
         return $.global.ThomadosFunBox.bakeCurve(payload);
+    };
+
+    $.global.thomadosFunBox_captureTextAnimation = function () {
+        return $.global.ThomadosFunBox.captureTextAnimation();
+    };
+
+    $.global.thomadosFunBox_applyCapturedTextAnimation = function (payload) {
+        return $.global.ThomadosFunBox.applyCapturedTextAnimation(payload);
     };
 
     $.global.thomadosFunBox_applyTextAnimation = function (payload) {

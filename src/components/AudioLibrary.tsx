@@ -45,7 +45,7 @@ function getPanelFilePath() {
   const decodedPath = decodeURIComponent(window.location.pathname);
 
   if (window.location.protocol !== 'file:') {
-    throw new Error('A biblioteca de audio deve ser aberta dentro do painel CEP compilado.');
+    throw new Error('A biblioteca de áudio deve ser aberta dentro do painel CEP compilado.');
   }
 
   return decodedPath.replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\');
@@ -65,7 +65,7 @@ function loadAudioAssets(): AudioAsset[] {
   const nodeRequire = getNodeRequire();
 
   if (!nodeRequire) {
-    throw new Error('Node.js nao esta disponivel neste runtime CEP.');
+    throw new Error('O Node.js não está disponível neste runtime CEP.');
   }
 
   const fs = nodeRequire('fs') as FsModule;
@@ -75,7 +75,7 @@ function loadAudioAssets(): AudioAsset[] {
   const audioDirectory = path.join(panelRoot, 'assets', 'sfx');
 
   if (!fs.existsSync(audioDirectory)) {
-    throw new Error(`Diretorio de audio nao encontrado: ${audioDirectory}`);
+    throw new Error(`Diretório de áudio não encontrado: ${audioDirectory}`);
   }
 
   return fs
@@ -139,7 +139,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
       setError('');
     } catch (playError) {
       const message = playError instanceof Error ? playError.message : String(playError);
-      setError(`Falha no preview: ${message}`);
+      setError(`Falha na prévia: ${message}`);
     }
   }
 
@@ -149,8 +149,8 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold">Biblioteca de Audios</h2>
-          <p className="mt-1 text-sm text-zinc-400">Efeitos locais disponiveis para preview e timeline.</p>
+          <h2 className="text-base font-semibold">Biblioteca de áudios</h2>
+          <p className="mt-1 text-sm text-zinc-400">Efeitos locais disponíveis para prévia e timeline.</p>
         </div>
         <button
           type="button"
@@ -173,7 +173,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
               <button
                 type="button"
                 onClick={() => togglePreview(asset)}
-                title={isPlaying ? 'Pausar preview' : 'Reproduzir preview'}
+                title={isPlaying ? 'Pausar prévia' : 'Reproduzir prévia'}
                 aria-label={isPlaying ? `Pausar ${asset.name}` : `Reproduzir ${asset.name}`}
                 className="flex h-10 w-10 items-center justify-center rounded-md border border-funbox-line text-sm text-funbox-accent transition hover:border-funbox-accent"
               >
@@ -191,7 +191,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
                 disabled={isInserting}
                 className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isInserting ? 'Adicionando...' : 'Adicionar a Timeline'}
+                {isInserting ? 'Adicionando...' : 'Adicionar à timeline'}
               </button>
             </div>
           );
@@ -199,7 +199,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
 
         {!error && assets.length === 0 && (
           <div className="rounded-md border border-dashed border-funbox-line px-3 py-6 text-center text-sm text-zinc-400">
-            Nenhum arquivo de audio encontrado.
+            Nenhum arquivo de áudio encontrado.
           </div>
         )}
 

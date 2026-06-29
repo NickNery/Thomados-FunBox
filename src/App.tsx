@@ -4,14 +4,20 @@ import BezierCurveEditor from './components/BezierCurveEditor';
 import TextAnimationGallery from './components/TextAnimationGallery';
 import {
   applyTemporalEaseToSelection,
-  applyTextAnimation,
+  applyCapturedTextAnimation,
   bakeCurveToSelection,
+  captureTextAnimationFromSelection,
   evalHostScript,
   getRuntimeInfo,
   importAndInsertAudio,
   isCepRuntime
 } from './cep/bridge';
-import type { BakeCurvePayload, RuntimeInfoResponse, TemporalEasePayload, TextAnimationPayload } from './cep/bridge';
+import type {
+  ApplyCapturedTextAnimationPayload,
+  BakeCurvePayload,
+  RuntimeInfoResponse,
+  TemporalEasePayload
+} from './cep/bridge';
 
 type PingState = {
   loading: boolean;
@@ -80,7 +86,7 @@ export default function App() {
       setApplyState({
         loading: false,
         output: '',
-        error: `Versao incompativel: ${runtime.info.appVersion}. Este build exige Premiere Pro 26.2.2.`,
+        error: `Versão incompatível: ${runtime.info.appVersion}. Este build exige o Premiere Pro 26.2.2.`,
         mode: null
       });
       return;
@@ -110,11 +116,11 @@ export default function App() {
       <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-5 py-6">
         <header className="border-b border-funbox-line pb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-funbox-accent">
-            Premiere Pro CEP Panel
+            Painel CEP para Premiere Pro
           </p>
           <h1 className="mt-3 text-3xl font-bold">Thomados FunBox</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-300">
-            Editor visual de curvas para speed e influence de keyframes.
+            Curvas, animações e áudios para o Premiere Pro.
           </p>
         </header>
 
@@ -131,9 +137,9 @@ export default function App() {
           {!runtime.loading && runtime.info?.compatible &&
             `Premiere ${runtime.info.appVersion} / CEP 12: pronto`}
           {!runtime.loading && runtime.info?.compatible === false &&
-            `Host ${runtime.info.appVersion} incompativel; esperado 26.2.2`}
+            `Host ${runtime.info.appVersion} incompatível; esperado 26.2.2`}
           {!runtime.loading && runtime.error && runtime.error}
-          {!runtime.loading && !runtime.info && !runtime.error && 'Preview de navegador; comandos do Premiere desativados.'}
+          {!runtime.loading && !runtime.info && !runtime.error && 'Prévia no navegador; comandos do Premiere desativados.'}
         </div>
 
         <BezierCurveEditor
@@ -145,7 +151,10 @@ export default function App() {
 
         <TextAnimationGallery
           isApplying={applyState.loading && applyState.mode === 'text'}
-          onApply={(payload: TextAnimationPayload) => runApply('text', () => applyTextAnimation(payload))}
+          onCapture={captureTextAnimationFromSelection}
+          onApply={(payload: ApplyCapturedTextAnimationPayload) =>
+            runApply('text', () => applyCapturedTextAnimation(payload))
+          }
         />
 
         <AudioLibrary
@@ -164,7 +173,7 @@ export default function App() {
             <div>
               <h2 className="text-base font-semibold">Ponte com o Premiere</h2>
               <p className="mt-1 text-sm text-zinc-400">
-                Runtime: {isCepRuntime() ? 'CEP detectado' : 'Navegador/Vite'}
+                Ambiente: {isCepRuntime() ? 'CEP detectado' : 'Navegador/Vite'}
               </p>
             </div>
             <button

@@ -11,6 +11,7 @@ declare global {
     };
     __adobe_cep__?: {
       evalScript: (script: string, callback?: (result: string) => void) => void;
+      getSystemPath?: (pathType: string) => string;
     };
   }
 }

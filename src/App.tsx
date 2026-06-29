@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AudioLibrary from './components/AudioLibrary';
 import BezierCurveEditor from './components/BezierCurveEditor';
 import TextAnimationGallery from './components/TextAnimationGallery';
@@ -7,10 +7,11 @@ import {
   applyTextAnimation,
   bakeCurveToSelection,
   evalHostScript,
+  getRuntimeInfo,
   importAndInsertAudio,
   isCepRuntime
 } from './cep/bridge';
-import type { BakeCurvePayload, TemporalEasePayload, TextAnimationPayload } from './cep/bridge';
+import type { BakeCurvePayload, RuntimeInfoResponse, TemporalEasePayload, TextAnimationPayload } from './cep/bridge';
 
 type PingState = {
   loading: boolean;
@@ -22,6 +23,12 @@ type ApplyMode = 'bezier' | 'bake' | 'text' | 'audio';
 
 type ApplyState = PingState & {
   mode: ApplyMode | null;
+};
+
+type RuntimeState = {
+  loading: boolean;
+  info: RuntimeInfoResponse | null;
+  error: string;
 };
 
 export default function App() {
@@ -36,6 +43,25 @@ export default function App() {
     error: '',
     mode: null
   });
+  const [runtime, setRuntime] = useState<RuntimeState>({
+    loading: true,
+    info: null,
+    error: ''
+  });
+
+  useEffect(() => {
+    if (!isCepRuntime()) {
+      setRuntime({ loading: false, info: null, error: '' });
+      return;
+    }
+
+    getRuntimeInfo()
+      .then((info) => setRuntime({ loading: false, info, error: '' }))
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setRuntime({ loading: false, info: null, error: message });
+      });
+  }, []);
 
   async function handleHostPing() {
     setPing({ loading: true, output: '', error: '' });
@@ -50,6 +76,16 @@ export default function App() {
   }
 
   async function runApply(mode: ApplyMode, runner: () => Promise<unknown>) {
+    if (runtime.info && runtime.info.compatible === false) {
+      setApplyState({
+        loading: false,
+        output: '',
+        error: `Versao incompativel: ${runtime.info.appVersion}. Este build exige Premiere Pro 26.2.2.`,
+        mode: null
+      });
+      return;
+    }
+
     setApplyState({ loading: true, output: '', error: '', mode });
 
     try {
@@ -81,6 +117,24 @@ export default function App() {
             Editor visual de curvas para speed e influence de keyframes.
           </p>
         </header>
+
+        <div
+          className={`border-l-4 px-3 py-2 text-sm ${
+            runtime.error || runtime.info?.compatible === false
+              ? 'border-red-500 bg-red-950/30 text-red-200'
+              : runtime.info?.compatible
+                ? 'border-emerald-500 bg-emerald-950/30 text-emerald-200'
+                : 'border-zinc-600 bg-zinc-900 text-zinc-300'
+          }`}
+        >
+          {runtime.loading && 'Validando Premiere Pro 26.2.2...'}
+          {!runtime.loading && runtime.info?.compatible &&
+            `Premiere ${runtime.info.appVersion} / CEP 12: pronto`}
+          {!runtime.loading && runtime.info?.compatible === false &&
+            `Host ${runtime.info.appVersion} incompativel; esperado 26.2.2`}
+          {!runtime.loading && runtime.error && runtime.error}
+          {!runtime.loading && !runtime.info && !runtime.error && 'Preview de navegador; comandos do Premiere desativados.'}
+        </div>
 
         <BezierCurveEditor
           isApplying={applyState.loading && applyState.mode === 'bezier'}

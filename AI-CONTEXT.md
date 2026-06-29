@@ -4,6 +4,8 @@
 
 Nome: Thomados FunBox
 
+Versao alvo fixa: Adobe Premiere Pro 26.2.2 com CEP/CSXS 12.0.
+
 Stack tecnologica:
 - Adobe CEP (Common Extensibility Platform)
 - Premiere Pro
@@ -72,6 +74,7 @@ Thomados-FunBox/
 Editor de Curvas: Concluido.
 Animacoes de Texto: Concluido.
 Biblioteca de Audios: Concluido.
+Compatibilidade Premiere Pro 26.2.2: Concluida.
 
 MVP (Minimum Viable Product) das 3 funcionalidades principais foi alcancado.
 
@@ -86,6 +89,12 @@ Itens presentes:
 - Funcao TypeScript para enviar parametros temporais ao host JSX.
 - Script JSX para percorrer clips selecionados, encontrar parametros keyframados e aplicar easing temporal quando suportado.
 - Fallback JSX para interpolacao Bezier nativa via `setInterpolationTypeAtKey()`.
+- Manifest restrito a PPRO 26.2.2 e runtime CSXS 12.0.
+- Permissoes CEF para Node.js e arquivos locais.
+- Diagnostico de runtime antes de executar comandos no host.
+- Validacao automatica de `host.jsx` como ECMAScript 3.
+- Testes de contrato para curva, Bake Curve, animacao de texto e audio.
+- Instalador PowerShell que valida o Premiere, gera a build, ativa PlayerDebugMode e instala no CEP do usuario.
 
 Observacao do primeiro teste no Premiere:
 - A API publica de `ComponentParam` nao expoe selecao individual de keyframes; quando o host nao encontra uma API privada/alternativa, o painel aplica a acao em todos os keyframes do parametro selecionado.
@@ -116,6 +125,15 @@ Modulo de Biblioteca de Audios:
 - O host JSX usa `app.project.importFiles(...)`, localiza o `ProjectItem`, encontra a primeira track de audio desbloqueada e insere o clip no CTI atual da sequencia.
 - Dois WAVs originais de teste acompanham o projeto: `ui-click.wav` e `soft-whoosh.wav`.
 
+Correcao de compatibilidade 26.2.2:
+- O host instalado foi confirmado como Premiere Pro 26.2.2 com CEPHtmlEngine/CSXS 12.0.1.
+- `CSXS/manifest.xml` foi atualizado de CSXS 11 para CSXS 12 e limitado a PPRO 26.2.2.
+- A insercao de audio passou a usar ticks e as assinaturas documentadas de `Track.overwriteClip`, `Sequence.insertClip` e `Track.insertClip`.
+- A busca de Position, Scale e Opacity agora usa `Component.matchName` e normalizacao de nomes localizados.
+- Duracoes de animacao sao limitadas ao comprimento real do clip.
+- O modulo de audio usa o caminho da extensao fornecido pelo CEP e possui permissoes de acesso a arquivos locais.
+- A extensao e instalada em `%APPDATA%/Adobe/CEP/extensions/com.thomados.funbox` por `npm run install:cep`.
+
 ## Proximos Passos
 
-As tres funcionalidades principais do MVP estao concluidas. Proximos passos ficam reservados para refinamento, testes praticos e empacotamento.
+Reiniciar o Premiere Pro 26.2.2 e executar o smoke test final dentro do painel instalado.

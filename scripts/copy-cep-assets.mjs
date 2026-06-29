@@ -1,4 +1,4 @@
-import { cp, mkdir } from 'node:fs/promises';
+import { copyFile, cp, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,4 +16,11 @@ for (const directory of ['CSXS', 'host']) {
     await cp(source, target, { recursive: true, force: true });
     console.log(`Copied ${directory} to dist/${directory}`);
   }
+}
+
+const debugFile = resolve(root, '.debug');
+
+if (existsSync(debugFile)) {
+  await copyFile(debugFile, resolve(dist, '.debug'));
+  console.log('Copied .debug to dist/.debug');
 }

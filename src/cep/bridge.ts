@@ -84,6 +84,17 @@ export type HostApplyResponse = {
   warnings?: string[];
 };
 
+export type RuntimeInfoResponse = HostApplyResponse & {
+  compatible?: boolean;
+  expectedVersion?: string;
+  appVersion?: string;
+  appName?: string;
+  projectName?: string;
+  sequenceName?: string;
+  selectedClips?: number;
+  cepUserAgent?: string;
+};
+
 function getHostBridge(): EvalScriptHost | null {
   if (typeof window === 'undefined') {
     return null;
@@ -114,11 +125,23 @@ export function evalHostScript(script: string): Promise<string> {
   }
 
   return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error('O Premiere nao respondeu ao comando JSX em 15 segundos.'));
+    }, 15000);
+
     try {
       hostBridge.evalScript(script, (result) => {
+        window.clearTimeout(timeout);
+
+        if (!result || result === 'EvalScript error.') {
+          reject(new Error('O host JSX retornou EvalScript error. Verifique a instalacao e o host.jsx.'));
+          return;
+        }
+
         resolve(result);
       });
     } catch (error) {
+      window.clearTimeout(timeout);
       reject(error);
     }
   });
@@ -130,62 +153,38 @@ function toExtendScriptLiteral(value: unknown) {
     .replace(/\u2029/g, '\\u2029');
 }
 
-export async function applyTemporalEaseToSelection(payload: TemporalEasePayload): Promise<HostApplyResponse> {
-  const script = `thomadosFunBox_applyTemporalEase(${toExtendScriptLiteral(payload)})`;
-  const rawResponse = await evalHostScript(script);
+async function invokeHost<T>(functionName: string, payload?: unknown): Promise<T> {
+  const argument = payload === undefined ? '' : toExtendScriptLiteral(payload);
+  const rawResponse = await evalHostScript(`${functionName}(${argument})`);
 
   try {
-    return JSON.parse(rawResponse) as HostApplyResponse;
+    return JSON.parse(rawResponse) as T;
   } catch {
-    return {
-      ok: false,
-      message: rawResponse || 'Resposta invalida do host JSX.',
-      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
-    };
+    throw new Error(`Resposta invalida de ${functionName}: ${rawResponse}`);
   }
+}
+
+export async function getRuntimeInfo(): Promise<RuntimeInfoResponse> {
+  const response = await invokeHost<RuntimeInfoResponse>('thomadosFunBox_getRuntimeInfo');
+
+  return {
+    ...response,
+    cepUserAgent: window.navigator.userAgent
+  };
+}
+
+export async function applyTemporalEaseToSelection(payload: TemporalEasePayload): Promise<HostApplyResponse> {
+  return invokeHost<HostApplyResponse>('thomadosFunBox_applyTemporalEase', payload);
 }
 
 export async function bakeCurveToSelection(payload: BakeCurvePayload): Promise<HostApplyResponse> {
-  const script = `thomadosFunBox_bakeCurve(${toExtendScriptLiteral(payload)})`;
-  const rawResponse = await evalHostScript(script);
-
-  try {
-    return JSON.parse(rawResponse) as HostApplyResponse;
-  } catch {
-    return {
-      ok: false,
-      message: rawResponse || 'Resposta invalida do host JSX.',
-      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
-    };
-  }
+  return invokeHost<HostApplyResponse>('thomadosFunBox_bakeCurve', payload);
 }
 
 export async function applyTextAnimation(payload: TextAnimationPayload): Promise<HostApplyResponse> {
-  const script = `thomadosFunBox_applyTextAnimation(${toExtendScriptLiteral(payload)})`;
-  const rawResponse = await evalHostScript(script);
-
-  try {
-    return JSON.parse(rawResponse) as HostApplyResponse;
-  } catch {
-    return {
-      ok: false,
-      message: rawResponse || 'Resposta invalida do host JSX.',
-      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
-    };
-  }
+  return invokeHost<HostApplyResponse>('thomadosFunBox_applyTextAnimation', payload);
 }
 
 export async function importAndInsertAudio(absoluteFilePath: string): Promise<HostApplyResponse> {
-  const script = `thomadosFunBox_importAndInsertAudio(${toExtendScriptLiteral(absoluteFilePath)})`;
-  const rawResponse = await evalHostScript(script);
-
-  try {
-    return JSON.parse(rawResponse) as HostApplyResponse;
-  } catch {
-    return {
-      ok: false,
-      message: rawResponse || 'Resposta invalida do host JSX.',
-      warnings: ['Nao foi possivel interpretar a resposta como JSON.']
-    };
-  }
+  return invokeHost<HostApplyResponse>('thomadosFunBox_importAndInsertAudio', absoluteFilePath);
 }

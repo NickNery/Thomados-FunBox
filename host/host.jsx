@@ -4,6 +4,7 @@
     var KF_INTERP_MODE_LINEAR = 0;
     var KF_INTERP_MODE_BEZIER = 5;
     var TICKS_PER_SECOND = 254016000000;
+    var EXPECTED_PREMIERE_VERSION = "26.2.2";
 
     function escapeJson(value) {
         if (value === null || value === undefined) {
@@ -71,6 +72,28 @@
 
     function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeIdentifier(value) {
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[\u00c0-\u00c5\u00e0-\u00e5]/g, "a")
+            .replace(/[\u00c8-\u00cb\u00e8-\u00eb]/g, "e")
+            .replace(/[\u00cc-\u00cf\u00ec-\u00ef]/g, "i")
+            .replace(/[\u00d2-\u00d6\u00f2-\u00f6]/g, "o")
+            .replace(/[\u00d9-\u00dc\u00f9-\u00fc]/g, "u")
+            .replace(/[\u00c7\u00e7]/g, "c")
+            .replace(/[\u00d1\u00f1]/g, "n")
+            .replace(/[^a-z0-9]+/g, " ")
+            .replace(/^\s+|\s+$/g, "");
+    }
+
+    function isExpectedPremiereVersion() {
+        try {
+            return String(app.version || "").indexOf(EXPECTED_PREMIERE_VERSION) === 0;
+        } catch (error) {
+            return false;
+        }
     }
 
     function getCollectionLength(collection) {
@@ -423,7 +446,7 @@
     }
 
     function getNormalizedPropertyName(property) {
-        return getPropertyName(property, "").toLowerCase();
+        return normalizeIdentifier(getPropertyName(property, ""));
     }
 
     function nameMatchesAliases(name, aliases) {
@@ -438,8 +461,26 @@
         return false;
     }
 
-    function findComponentParam(trackItem, aliases) {
-        var components = collectionToArray(trackItem.components);
+    function componentMatches(component, componentMatchNames) {
+        var matchName;
+        var displayName;
+
+        if (!componentMatchNames || componentMatchNames.length === 0) {
+            return true;
+        }
+
+        try {
+            matchName = normalizeIdentifier(component.matchName);
+            displayName = normalizeIdentifier(component.displayName);
+        } catch (error) {
+            return false;
+        }
+
+        return nameMatchesAliases(matchName, componentMatchNames)
+            || nameMatchesAliases(displayName, componentMatchNames);
+    }
+
+    function findParamInComponents(components, aliases, componentMatchNames) {
         var componentIndex;
         var propertyIndex;
         var properties;
@@ -447,6 +488,10 @@
         var name;
 
         for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
+            if (!componentMatches(components[componentIndex], componentMatchNames)) {
+                continue;
+            }
+
             properties = collectionToArray(components[componentIndex].properties);
 
             for (propertyIndex = 0; propertyIndex < properties.length; propertyIndex += 1) {
@@ -462,37 +507,46 @@
         return null;
     }
 
+    function findComponentParam(trackItem, aliases, componentMatchNames) {
+        var components = collectionToArray(trackItem.components);
+        var property = findParamInComponents(components, aliases, componentMatchNames);
+
+        if (!property && componentMatchNames && componentMatchNames.length > 0) {
+            property = findParamInComponents(components, aliases, null);
+        }
+
+        return property;
+    }
+
     function findMgtParam(trackItem, aliases) {
         var component;
         var properties;
         var index;
         var property;
 
-        if (typeof trackItem.getMGTComponent !== "function") {
-            return null;
-        }
+        component = null;
 
         try {
-            component = trackItem.getMGTComponent();
+            if (typeof trackItem.getMGTComponent === "function") {
+                component = trackItem.getMGTComponent();
+            }
         } catch (error) {
             component = null;
         }
 
-        if (!component) {
-            return null;
-        }
+        if (component) {
+            properties = collectionToArray(component.properties);
 
-        properties = collectionToArray(component.properties);
+            for (index = 0; index < properties.length; index += 1) {
+                property = properties[index];
 
-        for (index = 0; index < properties.length; index += 1) {
-            property = properties[index];
-
-            if (nameMatchesAliases(getNormalizedPropertyName(property), aliases)) {
-                return property;
+                if (nameMatchesAliases(getNormalizedPropertyName(property), aliases)) {
+                    return property;
+                }
             }
         }
 
-        return null;
+        return findComponentParam(trackItem, aliases, ["capsule", "graphic parameters", "mgt"]);
     }
 
     function enableKeyframes(property) {
@@ -555,14 +609,29 @@
         return fallback;
     }
 
-    function addPositionOffset(value, xOffset, yOffset) {
+    function getSequenceFrameHeight(sequence) {
+        var settings;
+        var height;
+
+        try {
+            settings = sequence && typeof sequence.getSettings === "function" ? sequence.getSettings() : null;
+            height = settings ? Number(settings.videoFrameHeight) : NaN;
+        } catch (error) {
+            height = NaN;
+        }
+
+        return isFinite(height) && height > 0 ? height : 1080;
+    }
+
+    function addPositionOffset(value, xOffset, yOffset, sequence) {
         var next;
         var scalarOffset;
+        var frameHeight = getSequenceFrameHeight(sequence);
 
         if (value instanceof Array && value.length >= 2) {
             next = value.slice(0);
-            scalarOffset = Math.abs(Number(next[1])) > 2 ? yOffset : yOffset / 1000;
-            next[0] = Number(next[0]) + (Math.abs(Number(next[0])) > 2 ? xOffset : xOffset / 1000);
+            scalarOffset = Math.abs(Number(next[1])) > 2 ? yOffset : yOffset / frameHeight;
+            next[0] = Number(next[0]) + (Math.abs(Number(next[0])) > 2 ? xOffset : xOffset / frameHeight);
             next[1] = Number(next[1]) + scalarOffset;
             return next;
         }
@@ -707,6 +776,11 @@
         var keyTime;
         var applyResult;
         var propertyName;
+
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
 
         try {
             sequence = app.project && app.project.activeSequence;
@@ -871,6 +945,11 @@
         var sampleY;
         var sampleTime;
         var sampleValue;
+
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
 
         try {
             sequence = app.project && app.project.activeSequence;
@@ -1086,15 +1165,42 @@
         return createTimeFromSeconds(0);
     }
 
-    function applyTransformAnimation(trackItem, payload, startTime, result) {
-        var scaleParam = findComponentParam(trackItem, ["scale", "escala"]);
-        var positionParam = findComponentParam(trackItem, ["position", "posicao", "posição"]);
-        var opacityParam = findComponentParam(trackItem, ["opacity", "opacidade"]);
+    function getTrackItemDurationSeconds(trackItem) {
+        var duration;
+        var start;
+        var end;
+
+        try {
+            duration = timeToSeconds(trackItem.duration);
+            if (isFinite(duration) && duration > 0) {
+                return duration;
+            }
+        } catch (durationError) {
+            // Fall back to end minus start.
+        }
+
+        try {
+            start = timeToSeconds(trackItem.start);
+            end = timeToSeconds(trackItem.end);
+            duration = end - start;
+        } catch (rangeError) {
+            duration = NaN;
+        }
+
+        return isFinite(duration) && duration > 0 ? duration : 0;
+    }
+
+    function applyTransformAnimation(trackItem, sequence, payload, startTime, result) {
+        var scaleParam = findComponentParam(trackItem, ["scale", "escala"], ["ae adbe motion", "motion", "movimento"]);
+        var positionParam = findComponentParam(trackItem, ["position", "posicao"], ["ae adbe motion", "motion", "movimento"]);
+        var opacityParam = findComponentParam(trackItem, ["opacity", "opacidade"], ["ae adbe opacity", "opacity", "opacidade"]);
         var revealParam = findMgtParam(trackItem, ["progress", "progresso", "reveal", "typewriter", "typing"]);
         var recipe = payload.recipe || {};
         var baseScale = currentParamValue(scaleParam, 100);
         var basePosition = currentParamValue(positionParam, [0.5, 0.5]);
         var baseOpacity = currentParamValue(opacityParam, 100);
+        var clipDuration = getTrackItemDurationSeconds(trackItem);
+        var animationDuration = clipDuration > 0 ? Math.min(payload.duration, clipDuration) : payload.duration;
         var start;
         var mid;
         var end;
@@ -1102,9 +1208,9 @@
         var opacityEndTime;
 
         start = startTime;
-        mid = timeOffset(startTime, payload.duration * 0.65);
-        late = timeOffset(startTime, payload.duration * 0.18);
-        end = timeOffset(startTime, payload.duration);
+        mid = timeOffset(startTime, animationDuration * 0.65);
+        late = timeOffset(startTime, animationDuration * 0.18);
+        end = timeOffset(startTime, animationDuration);
 
         if (recipe.scaleStart !== null && recipe.scaleStart !== undefined && scaleParam) {
             recordAnimationKey(scaleParam, start, scaleValue(baseScale, recipe.scaleStart / 100), "Scale", result);
@@ -1117,7 +1223,7 @@
         }
 
         if (recipe.positionYOffset !== null && recipe.positionYOffset !== undefined && recipe.positionYOffset !== 0 && positionParam) {
-            recordAnimationKey(positionParam, start, addPositionOffset(basePosition, 0, recipe.positionYOffset), "Position", result);
+            recordAnimationKey(positionParam, start, addPositionOffset(basePosition, 0, recipe.positionYOffset, sequence), "Position", result);
             recordAnimationKey(positionParam, end, basePosition, "Position", result);
         }
 
@@ -1168,6 +1274,11 @@
         var startTime;
         var beforeApplied;
 
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
+
         result.animationType = textPayload.type;
         result.presetName = textPayload.presetName;
 
@@ -1207,7 +1318,7 @@
             }
 
             try {
-                applyTransformAnimation(trackItem, textPayload, startTime, result);
+                applyTransformAnimation(trackItem, sequence, textPayload, startTime, result);
             } catch (animationError) {
                 result.warnings.push(
                     "Falha ao aplicar animacao em "
@@ -1315,7 +1426,7 @@
                 locked = false;
             }
 
-            if (!locked && typeof track.insertClip === "function") {
+            if (!locked && (typeof track.overwriteClip === "function" || typeof track.insertClip === "function")) {
                 return {
                     track: track,
                     index: index
@@ -1324,6 +1435,44 @@
         }
 
         return null;
+    }
+
+    function timeToTicksString(time) {
+        var seconds;
+
+        if (time && time.ticks !== undefined) {
+            return String(time.ticks);
+        }
+
+        seconds = timeToSeconds(time);
+
+        if (!isFinite(seconds)) {
+            throw new Error("Tempo invalido para insercao de audio.");
+        }
+
+        return String(Math.round(seconds * TICKS_PER_SECOND));
+    }
+
+    function insertAudioProjectItem(sequence, trackResult, projectItem, playheadTime) {
+        var ticks = timeToTicksString(playheadTime);
+        var insertResult;
+
+        if (typeof trackResult.track.overwriteClip === "function") {
+            insertResult = trackResult.track.overwriteClip(projectItem, ticks);
+            return insertResult !== false;
+        }
+
+        if (typeof sequence.insertClip === "function") {
+            insertResult = sequence.insertClip(projectItem, playheadTime, 0, trackResult.index);
+            return insertResult === true;
+        }
+
+        if (typeof trackResult.track.insertClip === "function") {
+            trackResult.track.insertClip(projectItem, ticks, 0, trackResult.index);
+            return true;
+        }
+
+        return false;
     }
 
     function importAndInsertAudio(absoluteFilePath) {
@@ -1344,6 +1493,11 @@
         var trackResult;
         var playheadTime;
 
+        if (!isExpectedPremiereVersion()) {
+            result.message = "Este build exige Premiere Pro " + EXPECTED_PREMIERE_VERSION + ". Host atual: " + app.version + ".";
+            return result;
+        }
+
         if (!result.filePath || !sourceFile.exists) {
             result.message = "Arquivo de audio nao encontrado: " + result.filePath;
             return result;
@@ -1360,11 +1514,12 @@
             return result;
         }
 
+        result.filePath = sourceFile.fsName;
         projectItem = findProjectItemByPath(app.project.rootItem, result.filePath);
 
         if (!projectItem) {
             try {
-                importResult = app.project.importFiles([result.filePath], true, app.project.rootItem, false);
+                importResult = app.project.importFiles([sourceFile.fsName], true, app.project.rootItem, false);
                 result.imported = importResult === true;
             } catch (importError) {
                 result.message = "Falha ao importar o audio: " + importError;
@@ -1389,9 +1544,12 @@
 
         try {
             playheadTime = getSequencePlayheadTime(sequence);
-            trackResult.track.insertClip(projectItem, playheadTime);
-            result.inserted = true;
+            result.inserted = insertAudioProjectItem(sequence, trackResult, projectItem, playheadTime);
             result.audioTrack = trackResult.index;
+
+            if (!result.inserted) {
+                throw new Error("O Premiere recusou a insercao na faixa de audio.");
+            }
         } catch (insertError) {
             result.message = "Audio importado, mas falhou ao inserir na timeline: " + insertError;
             return result;
@@ -1402,44 +1560,105 @@
         return result;
     }
 
+    function getRuntimeInfo() {
+        var sequence = null;
+        var selection = [];
+        var projectName = "";
+        var sequenceName = "";
+        var appName = "Premiere Pro";
+
+        try {
+            appName = app.name || appName;
+            projectName = app.project ? app.project.name : "";
+            sequence = app.project && app.project.activeSequence;
+            sequenceName = sequence ? sequence.name : "";
+
+            if (sequence && typeof sequence.getSelection === "function") {
+                selection = collectionToArray(sequence.getSelection());
+            }
+        } catch (error) {
+            return {
+                ok: false,
+                compatible: false,
+                expectedVersion: EXPECTED_PREMIERE_VERSION,
+                appVersion: String(app.version || ""),
+                appName: appName,
+                projectName: projectName,
+                sequenceName: sequenceName,
+                selectedClips: 0,
+                message: "Falha ao consultar o runtime do Premiere: " + error,
+                warnings: []
+            };
+        }
+
+        return {
+            ok: isExpectedPremiereVersion(),
+            compatible: isExpectedPremiereVersion(),
+            expectedVersion: EXPECTED_PREMIERE_VERSION,
+            appVersion: String(app.version || ""),
+            appName: appName,
+            projectName: projectName,
+            sequenceName: sequenceName,
+            selectedClips: selection.length,
+            message: isExpectedPremiereVersion()
+                ? "Runtime Premiere Pro 26.2.2 validado."
+                : "Versao incompativel do Premiere Pro.",
+            warnings: []
+        };
+    }
+
+    function safeJsonCall(callback) {
+        try {
+            return stringifyJson(callback());
+        } catch (error) {
+            return stringifyJson({
+                ok: false,
+                message: "Falha interna no host JSX: " + error,
+                warnings: []
+            });
+        }
+    }
+
     $.global.ThomadosFunBox = {
         ping: function () {
-            var projectName = "";
+            return safeJsonCall(getRuntimeInfo);
+        },
 
-            try {
-                projectName = app.project ? app.project.name : "";
-            } catch (error) {
-                projectName = "";
-            }
-
-            return "{"
-                + "\"ok\":true,"
-                + jsonPair("message", "Ponte JSX ativa no Premiere Pro") + ","
-                + jsonPair("appName", app.name || "Premiere Pro") + ","
-                + jsonPair("appVersion", app.version || "") + ","
-                + jsonPair("projectName", projectName)
-                + "}";
+        getRuntimeInfo: function () {
+            return safeJsonCall(getRuntimeInfo);
         },
 
         applyTemporalEase: function (payload) {
-            return stringifyJson(applyTemporalEase(payload));
+            return safeJsonCall(function () {
+                return applyTemporalEase(payload);
+            });
         },
 
         bakeCurve: function (payload) {
-            return stringifyJson(bakeCurve(payload));
+            return safeJsonCall(function () {
+                return bakeCurve(payload);
+            });
         },
 
         applyTextAnimation: function (payload) {
-            return stringifyJson(applyTextAnimation(payload));
+            return safeJsonCall(function () {
+                return applyTextAnimation(payload);
+            });
         },
 
         importAndInsertAudio: function (absoluteFilePath) {
-            return stringifyJson(importAndInsertAudio(absoluteFilePath));
+            return safeJsonCall(function () {
+                return importAndInsertAudio(absoluteFilePath);
+            });
         }
     };
 
     $.global.thomadosFunBox_ping = function () {
         return $.global.ThomadosFunBox.ping();
+    };
+
+    $.global.thomadosFunBox_getRuntimeInfo = function () {
+        return $.global.ThomadosFunBox.getRuntimeInfo();
     };
 
     $.global.thomadosFunBox_applyTemporalEase = function (payload) {

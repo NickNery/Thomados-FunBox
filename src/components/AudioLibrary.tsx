@@ -33,6 +33,15 @@ function getNodeRequire() {
 }
 
 function getPanelFilePath() {
+  const cepExtensionPath = window.__adobe_cep__?.getSystemPath?.('extension');
+
+  if (cepExtensionPath) {
+    return decodeURIComponent(cepExtensionPath)
+      .replace(/^file:\/\/+/, '')
+      .replace(/^\/([A-Za-z]:)/, '$1')
+      .replace(/\//g, '\\');
+  }
+
   const decodedPath = decodeURIComponent(window.location.pathname);
 
   if (window.location.protocol !== 'file:') {
@@ -61,7 +70,8 @@ function loadAudioAssets(): AudioAsset[] {
 
   const fs = nodeRequire('fs') as FsModule;
   const path = nodeRequire('path') as PathModule;
-  const panelRoot = path.dirname(getPanelFilePath());
+  const panelPath = getPanelFilePath();
+  const panelRoot = path.extname(panelPath) ? path.dirname(panelPath) : panelPath;
   const audioDirectory = path.join(panelRoot, 'assets', 'sfx');
 
   if (!fs.existsSync(audioDirectory)) {

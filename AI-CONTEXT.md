@@ -42,9 +42,11 @@ Fluxo atual:
 2. Seleciona o clipe animado na timeline.
 3. Digita um nome e usa `Registrar keyframes`.
 4. O host percorre os componentes e parâmetros animados do clipe.
-5. São capturados valores, tempos relativos ao início do clipe e tipos de interpolação disponíveis.
-6. O preset é salvo em LocalStorage.
-7. Ao aplicar o preset, o host procura os mesmos componentes e parâmetros no clipe de destino e recria os keyframes.
+5. São capturados valores e tempos locais relativos ao início do clipe.
+6. Propriedades conhecidas, como Escala, Posição e Opacidade, recebem uma identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
+7. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
+8. O preset é salvo em LocalStorage.
+9. Ao aplicar o preset, o host encontra o parâmetro equivalente no clipe de destino e recria os keyframes no mesmo tempo local.
 
 O formato TypeScript principal é `CapturedTextAnimationPreset`, definido em `src/cep/bridge.ts`.
 
@@ -58,7 +60,7 @@ O Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` na API pública CEP. 
 
 ## Biblioteca de Áudios
 
-Os arquivos ficam em `public/assets/sfx`. O front-end usa o Node.js do CEP para listar e reproduzir os arquivos. O host importa o áudio no projeto e o insere no CTI da sequência usando ticks.
+O diretório inicial fica em `public/assets/sfx`, mas o usuário pode escolher qualquer pasta pelo seletor nativo do CEP. A raiz escolhida é persistida em LocalStorage. O painel lista áudios e subpastas do nível atual, oferece breadcrumbs e permite navegar sem sair da raiz selecionada. O host importa o áudio no projeto e o insere no CTI da sequência usando ticks.
 
 ## Qualidade
 
@@ -70,4 +72,4 @@ Os arquivos ficam em `public/assets/sfx`. O front-end usa o Node.js do CEP para 
 
 ## Próximos Passos
 
-Executar um smoke test no Premiere com um clipe de texto que contenha keyframes reais, registrar o preset e reaplicá-lo em outro clipe compatível.
+Executar um smoke test no Premiere com um pop-in de Escala iniciado depois do começo do clipe e validar uma pasta de áudio que contenha múltiplos níveis de subpastas.

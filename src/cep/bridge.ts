@@ -40,20 +40,27 @@ export type CapturedKeyframe = {
   offsetSeconds: number;
   value: unknown;
   interpolationType?: number | null;
+  sampled?: boolean;
 };
 
 export type CapturedAnimationProperty = {
   componentMatchName: string;
   componentDisplayName: string;
   componentIndex: number;
+  componentRole?: 'motion' | 'vector-motion' | 'opacity' | 'other';
   propertyDisplayName: string;
   propertyIndex: number;
+  semanticKey?: 'scale' | 'position' | 'opacity' | 'rotation' | 'anchor-point' | '';
+  sourceKeyframeCount?: number;
+  sampledKeyframeCount?: number;
+  curveSampled?: boolean;
   keyframes: CapturedKeyframe[];
 };
 
 export type CapturedTextAnimation = {
   sourceClipName: string;
   durationSeconds: number;
+  timeBasis?: 'clip';
   properties: CapturedAnimationProperty[];
 };
 
@@ -81,6 +88,8 @@ export type HostApplyResponse = {
   components?: number;
   properties?: number;
   keys?: number;
+  sourceKeys?: number;
+  sampledKeys?: number;
   fallbacks?: number;
   temporalEaseApplied?: number;
   interpolationApplied?: number;

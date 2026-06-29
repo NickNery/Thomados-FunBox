@@ -442,6 +442,93 @@
         throw new Error("Parâmetro sem getValueAtKey/getValueAtTime.");
     }
 
+    function isNumericAnimationValue(value) {
+        var index;
+
+        if (typeof value === "number") {
+            return isFinite(value);
+        }
+
+        if (!isArrayValue(value) || value.length === 0) {
+            return false;
+        }
+
+        for (index = 0; index < value.length; index += 1) {
+            if (!isNumericAnimationValue(value[index])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function samplePropertyCurve(property, keyframes) {
+        var samples = [];
+        var intervalIndex;
+        var startKey;
+        var endKey;
+        var startSeconds;
+        var endSeconds;
+        var duration;
+        var sampleCount;
+        var sampleIndex;
+        var sampleSeconds;
+        var sampleTime;
+        var sampleValue;
+
+        if (typeof property.getValueAtTime !== "function" || keyframes.length < 2) {
+            return samples;
+        }
+
+        for (intervalIndex = 0; intervalIndex < keyframes.length - 1; intervalIndex += 1) {
+            startKey = keyframes[intervalIndex];
+            endKey = keyframes[intervalIndex + 1];
+
+            if (!isNumericAnimationValue(startKey.value) || !isNumericAnimationValue(endKey.value)) {
+                continue;
+            }
+
+            startSeconds = startKey.offsetSeconds;
+            endSeconds = endKey.offsetSeconds;
+            duration = endSeconds - startSeconds;
+
+            if (!isFinite(duration) || duration <= 0) {
+                continue;
+            }
+
+            sampleCount = Math.min(24, Math.max(1, Math.ceil(duration * 15) - 1));
+
+            for (sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
+                sampleSeconds = startSeconds + duration * sampleIndex / (sampleCount + 1);
+                sampleTime = createTimeFromSeconds(sampleSeconds);
+
+                try {
+                    sampleValue = property.getValueAtTime(sampleTime);
+
+                    if (isNumericAnimationValue(sampleValue)) {
+                        samples.push({
+                            offsetSeconds: sampleSeconds,
+                            value: sampleValue,
+                            interpolationType: KF_INTERP_MODE_LINEAR,
+                            sampled: true
+                        });
+                    }
+                } catch (sampleError) {
+                    // Mantém os keyframes originais quando o parâmetro não permite amostragem.
+                }
+            }
+        }
+
+        return samples;
+    }
+
+    function sortCapturedKeyframes(keyframes) {
+        keyframes.sort(function (left, right) {
+            return left.offsetSeconds - right.offsetSeconds;
+        });
+        return keyframes;
+    }
+
     function getPropertyName(property, fallback) {
         try {
             return property.displayName || property.name || fallback;
@@ -452,6 +539,126 @@
 
     function getNormalizedPropertyName(property) {
         return normalizeIdentifier(getPropertyName(property, ""));
+    }
+
+    function getComponentRole(component) {
+        var name = normalizeIdentifier(
+            getComponentString(component, "matchName", "")
+            + " "
+            + getComponentString(component, "displayName", "")
+        );
+
+        if (name.indexOf("vector motion") !== -1 || name.indexOf("movimento vetorial") !== -1) {
+            return "vector-motion";
+        }
+
+        if (name.indexOf("motion") !== -1 || name.indexOf("movimento") !== -1) {
+            return "motion";
+        }
+
+        if (name.indexOf("opacity") !== -1 || name.indexOf("opacidade") !== -1) {
+            return "opacity";
+        }
+
+        return "other";
+    }
+
+    function getPropertySemanticKey(propertyOrName) {
+        var name = typeof propertyOrName === "string"
+            ? normalizeIdentifier(propertyOrName)
+            : getNormalizedPropertyName(propertyOrName);
+
+        if (name === "scale" || name === "escala" || name === "uniform scale" || name === "escala uniforme") {
+            return "scale";
+        }
+
+        if (name === "position" || name === "posicao") {
+            return "position";
+        }
+
+        if (name === "opacity" || name === "opacidade") {
+            return "opacity";
+        }
+
+        if (name === "rotation" || name === "rotacao" || name === "giro") {
+            return "rotation";
+        }
+
+        if (name === "anchor point" || name === "ponto de ancoragem" || name === "ponto ancora") {
+            return "anchor-point";
+        }
+
+        return "";
+    }
+
+    function getSemanticAliases(semanticKey) {
+        if (semanticKey === "scale") {
+            return ["scale", "escala", "uniform scale", "escala uniforme"];
+        }
+
+        if (semanticKey === "position") {
+            return ["position", "posicao"];
+        }
+
+        if (semanticKey === "opacity") {
+            return ["opacity", "opacidade"];
+        }
+
+        if (semanticKey === "rotation") {
+            return ["rotation", "rotacao", "giro"];
+        }
+
+        if (semanticKey === "anchor-point") {
+            return ["anchor point", "ponto de ancoragem", "ponto ancora"];
+        }
+
+        return [];
+    }
+
+    function findSemanticPropertyInRole(components, semanticKey, componentRole) {
+        var aliases = getSemanticAliases(semanticKey);
+        var componentIndex;
+        var properties;
+        var propertyIndex;
+
+        for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
+            if (componentRole && getComponentRole(components[componentIndex]) !== componentRole) {
+                continue;
+            }
+
+            properties = collectionToArray(components[componentIndex].properties);
+
+            for (propertyIndex = 0; propertyIndex < properties.length; propertyIndex += 1) {
+                if (nameEqualsAliases(getNormalizedPropertyName(properties[propertyIndex]), aliases)) {
+                    return properties[propertyIndex];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function findSemanticProperty(trackItem, semanticKey, preferredComponentRole) {
+        var components = collectionToArray(trackItem.components);
+        var property = null;
+
+        if (preferredComponentRole && preferredComponentRole !== "other") {
+            property = findSemanticPropertyInRole(components, semanticKey, preferredComponentRole);
+        }
+
+        if (!property && preferredComponentRole === "vector-motion") {
+            property = findSemanticPropertyInRole(components, semanticKey, "motion");
+        }
+
+        if (!property && preferredComponentRole === "motion") {
+            property = findSemanticPropertyInRole(components, semanticKey, "vector-motion");
+        }
+
+        if (!property) {
+            property = findSemanticPropertyInRole(components, semanticKey, null);
+        }
+
+        return property;
     }
 
     function nameMatchesAliases(name, aliases) {
@@ -1245,6 +1452,8 @@
             components: 0,
             properties: 0,
             keys: 0,
+            sourceKeys: 0,
+            sampledKeys: 0,
             clipName: "",
             animation: null,
             warnings: []
@@ -1252,8 +1461,6 @@
         var sequence;
         var selection;
         var trackItem;
-        var clipStartSeconds;
-        var clipDuration;
         var components;
         var componentIndex;
         var component;
@@ -1265,11 +1472,9 @@
         var keyIndex;
         var keyTime;
         var keySeconds;
-        var firstKeySeconds;
-        var lastKeySeconds;
-        var sequenceRelative;
         var offsetSeconds;
         var capturedKeyframes;
+        var sampledKeyframes;
         var capturedProperties = [];
         var maxOffset = 0;
 
@@ -1295,8 +1500,6 @@
         }
 
         result.clipName = trackItem.name || "Clipe selecionado";
-        clipStartSeconds = timeToSeconds(trackItem.start);
-        clipDuration = getTrackItemDurationSeconds(trackItem);
         components = collectionToArray(trackItem.components);
 
         for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
@@ -1315,16 +1518,13 @@
                         continue;
                     }
 
-                    firstKeySeconds = timeToSeconds(sortedKeys[0]);
-                    lastKeySeconds = timeToSeconds(sortedKeys[sortedKeys.length - 1]);
-                    sequenceRelative = firstKeySeconds >= clipStartSeconds - 0.05
-                        && (clipDuration <= 0 || lastKeySeconds <= clipStartSeconds + clipDuration + 0.05);
                     capturedKeyframes = [];
 
                     for (keyIndex = 0; keyIndex < sortedKeys.length; keyIndex += 1) {
                         keyTime = sortedKeys[keyIndex];
                         keySeconds = timeToSeconds(keyTime);
-                        offsetSeconds = sequenceRelative ? keySeconds - clipStartSeconds : keySeconds;
+                        // ComponentParam key times are relative to the beginning of the clip.
+                        offsetSeconds = keySeconds;
 
                         if (!isFinite(offsetSeconds) || offsetSeconds < -0.05) {
                             continue;
@@ -1334,19 +1534,30 @@
                         capturedKeyframes.push({
                             offsetSeconds: offsetSeconds,
                             value: getValueAtKeyTime(property, keyTime),
-                            interpolationType: getInterpolationType(property, keyTime)
+                            interpolationType: getInterpolationType(property, keyTime),
+                            sampled: false
                         });
                         maxOffset = Math.max(maxOffset, offsetSeconds);
                         result.keys += 1;
+                        result.sourceKeys += 1;
                     }
 
                     if (capturedKeyframes.length > 0) {
+                        sampledKeyframes = samplePropertyCurve(property, capturedKeyframes);
+                        result.sampledKeys += sampledKeyframes.length;
+                        result.keys += sampledKeyframes.length;
+                        capturedKeyframes = sortCapturedKeyframes(capturedKeyframes.concat(sampledKeyframes));
                         capturedProperties.push({
                             componentMatchName: getComponentString(component, "matchName", ""),
                             componentDisplayName: getComponentString(component, "displayName", "Componente"),
                             componentIndex: componentIndex,
+                            componentRole: getComponentRole(component),
                             propertyDisplayName: getPropertyName(property, "Parâmetro"),
                             propertyIndex: propertyIndex,
+                            semanticKey: getPropertySemanticKey(property),
+                            sourceKeyframeCount: capturedKeyframes.length - sampledKeyframes.length,
+                            sampledKeyframeCount: sampledKeyframes.length,
+                            curveSampled: sampledKeyframes.length > 0,
                             keyframes: capturedKeyframes
                         });
                         result.properties += 1;
@@ -1370,6 +1581,7 @@
         result.animation = {
             sourceClipName: result.clipName,
             durationSeconds: maxOffset,
+            timeBasis: "clip",
             properties: capturedProperties
         };
         result.ok = true;
@@ -1408,10 +1620,24 @@
         return getCollectionItem(components, Number(capturedProperty.componentIndex));
     }
 
-    function findCapturedProperty(component, capturedProperty) {
-        var properties = collectionToArray(component && component.properties);
+    function findCapturedProperty(trackItem, capturedProperty) {
+        var semanticKey = capturedProperty.semanticKey || getPropertySemanticKey(capturedProperty.propertyDisplayName);
+        var property;
+        var component;
+        var properties;
         var targetName = normalizeIdentifier(capturedProperty.propertyDisplayName);
         var index;
+
+        if (semanticKey) {
+            property = findSemanticProperty(trackItem, semanticKey, capturedProperty.componentRole || "");
+
+            if (property) {
+                return property;
+            }
+        }
+
+        component = findCapturedComponent(trackItem, capturedProperty);
+        properties = collectionToArray(component && component.properties);
 
         for (index = 0; index < properties.length; index += 1) {
             if (normalizeIdentifier(getPropertyName(properties[index], "")) === targetName) {
@@ -1439,11 +1665,9 @@
         var selection;
         var clipIndex;
         var trackItem;
-        var clipStart;
         var clipDuration;
         var propertyIndex;
         var capturedProperty;
-        var component;
         var property;
         var keyIndex;
         var capturedKey;
@@ -1476,13 +1700,11 @@
 
         for (clipIndex = 0; clipIndex < selection.length; clipIndex += 1) {
             trackItem = selection[clipIndex];
-            clipStart = getTrackItemStartTime(trackItem, sequence);
             clipDuration = getTrackItemDurationSeconds(trackItem);
 
             for (propertyIndex = 0; propertyIndex < animation.properties.length; propertyIndex += 1) {
                 capturedProperty = animation.properties[propertyIndex];
-                component = findCapturedComponent(trackItem, capturedProperty);
-                property = findCapturedProperty(component, capturedProperty);
+                property = findCapturedProperty(trackItem, capturedProperty);
 
                 if (!property) {
                     result.warnings.push(
@@ -1512,10 +1734,12 @@
                         continue;
                     }
 
-                    targetTime = timeOffset(clipStart, Math.max(0, numberValue(capturedKey.offsetSeconds, 0)));
+                    targetTime = createTimeFromSeconds(Math.max(0, numberValue(capturedKey.offsetSeconds, 0)));
                     setAnimationKey(property, targetTime, capturedKey.value);
 
-                    if (capturedKey.interpolationType !== null && capturedKey.interpolationType !== undefined) {
+                    if (capturedProperty.curveSampled) {
+                        setInterpolationMode(property, targetTime, KF_INTERP_MODE_LINEAR);
+                    } else if (capturedKey.interpolationType !== null && capturedKey.interpolationType !== undefined) {
                         setInterpolationMode(property, targetTime, Number(capturedKey.interpolationType));
                     }
 
@@ -1815,6 +2039,18 @@
         if (typeof trackResult.track.insertClip === "function") {
             trackResult.track.insertClip(projectItem, ticks, 0, trackResult.index);
             return true;
+        }
+
+        return false;
+    }
+
+    function nameEqualsAliases(name, aliases) {
+        var index;
+
+        for (index = 0; index < aliases.length; index += 1) {
+            if (name === aliases[index]) {
+                return true;
+            }
         }
 
         return false;

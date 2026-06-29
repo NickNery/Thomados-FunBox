@@ -9,6 +9,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true
   },
+  optimizeDeps: {
+    exclude: ['lucide-react']
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

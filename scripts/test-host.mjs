@@ -38,12 +38,21 @@ function collection(items) {
   return items;
 }
 
-function makeParam(displayName, initialValue, initialKeys = [new MockTime(1), new MockTime(2)]) {
+function makeParam(
+  displayName,
+  initialValue,
+  initialKeys = [new MockTime(1), new MockTime(2)],
+  keyValues,
+  sampleValue
+) {
+  const interpolationWrites = [];
   const values = initialKeys.map((time, index) => ({
     time,
-    value: Array.isArray(initialValue)
-      ? initialValue.map((item) => item + index * 0.1)
-      : initialValue + index * 10
+    value: keyValues
+      ? keyValues[index]
+      : Array.isArray(initialValue)
+        ? initialValue.map((item) => item + index * 0.1)
+        : initialValue + index * 10
   }));
 
   function findValue(time) {
@@ -53,13 +62,15 @@ function makeParam(displayName, initialValue, initialKeys = [new MockTime(1), ne
 
   return {
     displayName,
+    _values: values,
+    _interpolationWrites: interpolationWrites,
     areKeyframesSupported: () => true,
     setTimeVarying: () => 0,
     isTimeVarying: () => true,
     getKeys: () => values.map((item) => item.time),
     getValue: () => initialValue,
     getValueAtKey: (time) => findValue(time)?.value ?? initialValue,
-    getValueAtTime: (time) => findValue(time)?.value ?? initialValue,
+    getValueAtTime: (time) => sampleValue?.(Number(time.seconds)) ?? findValue(time)?.value ?? initialValue,
     addKey: (time) => {
       if (!findValue(time)) {
         values.push({ time, value: initialValue });
@@ -76,7 +87,10 @@ function makeParam(displayName, initialValue, initialKeys = [new MockTime(1), ne
       return 0;
     },
     getInterpolationTypeAtKey: () => 5,
-    setInterpolationTypeAtKey: () => 0,
+    setInterpolationTypeAtKey: (time, mode) => {
+      interpolationWrites.push({ seconds: Number(time.seconds), mode });
+      return 0;
+    },
     removeKey: (time) => {
       const index = values.indexOf(findValue(time));
       if (index >= 0) values.splice(index, 1);
@@ -85,21 +99,52 @@ function makeParam(displayName, initialValue, initialKeys = [new MockTime(1), ne
   };
 }
 
-const start = new MockTime(1);
-const end = new MockTime(5);
-const position = makeParam('Posicao', [0.5, 0.5], [start, end]);
-const scale = makeParam('Escala', 100, [start, end]);
-const opacity = makeParam('Opacidade', 100, [start, end]);
-const clip = {
+const firstPopKey = new MockTime(5);
+const lastPopKey = new MockTime(5.6);
+const sourceScale = makeParam(
+  'Escala',
+  100,
+  [firstPopKey, lastPopKey],
+  [15, 100],
+  (seconds) => {
+    const progress = Math.max(0, Math.min(1, (seconds - 5) / 0.6));
+    return 15 + 85 * progress * progress;
+  }
+);
+const sourceClip = {
   name: 'Graphic Clip',
-  start,
-  end,
-  duration: new MockTime(4),
+  start: new MockTime(20),
+  end: new MockTime(30),
+  duration: new MockTime(10),
   components: collection([
-    { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([position, scale]) },
-    { matchName: 'AE.ADBE Opacity', displayName: 'Opacidade', properties: collection([opacity]) }
+    {
+      matchName: 'AE.ADBE Vector Motion',
+      displayName: 'Movimento vetorial',
+      properties: collection([sourceScale])
+    }
   ])
 };
+const targetScale = makeParam('Escala', 100, []);
+const targetClip = {
+  name: 'Video Clip',
+  start: new MockTime(100),
+  end: new MockTime(110),
+  duration: new MockTime(10),
+  components: collection([
+    { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([targetScale]) }
+  ])
+};
+const curveScale = makeParam('Escala', 100, [new MockTime(1), new MockTime(2)]);
+const curveClip = {
+  name: 'Curve Test Clip',
+  start: new MockTime(0),
+  end: new MockTime(4),
+  duration: new MockTime(4),
+  components: collection([
+    { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([curveScale]) }
+  ])
+};
+let selectedItems = [curveClip];
 
 const inserted = [];
 const audioTrack = {
@@ -114,7 +159,7 @@ const rootItem = { name: 'Root', children: collection([]) };
 const sequence = {
   name: 'Sequence 01',
   audioTracks: collection([audioTrack]),
-  getSelection: () => collection([clip]),
+  getSelection: () => collection(selectedItems.slice()),
   getPlayerPosition: () => new MockTime(3),
   getSettings: () => ({ videoFrameWidth: 1920, videoFrameHeight: 1080 })
 };
@@ -178,17 +223,39 @@ const bake = parse(api.thomadosFunBox_bakeCurve({
 assert.equal(bake.ok, true);
 assert.ok(bake.bakedKeys > 0);
 
+selectedItems = [sourceClip];
 const capturedAnimation = parse(api.thomadosFunBox_captureTextAnimation());
 assert.equal(capturedAnimation.ok, true);
-assert.ok(capturedAnimation.animation.properties.length > 0);
-assert.ok(capturedAnimation.keys > 0);
+assert.equal(capturedAnimation.animation.timeBasis, 'clip');
+assert.equal(capturedAnimation.animation.properties.length, 1);
+assert.equal(capturedAnimation.animation.properties[0].semanticKey, 'scale');
+assert.equal(capturedAnimation.animation.properties[0].componentRole, 'vector-motion');
+assert.equal(capturedAnimation.animation.properties[0].sourceKeyframeCount, 2);
+assert.equal(capturedAnimation.animation.properties[0].sampledKeyframeCount, 8);
+assert.equal(capturedAnimation.animation.properties[0].curveSampled, true);
+assert.equal(capturedAnimation.animation.properties[0].keyframes[0].offsetSeconds, 5);
+assert.equal(capturedAnimation.animation.properties[0].keyframes.at(-1).offsetSeconds, 5.6);
+
+selectedItems = [targetClip];
 
 const appliedAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
   presetName: 'Teste capturado',
   animation: capturedAnimation.animation
 }));
 assert.equal(appliedAnimation.ok, true);
-assert.ok(appliedAnimation.applied > 0);
+assert.equal(appliedAnimation.applied, 10);
+assert.equal(targetScale._values.length, 10);
+assert.deepEqual(
+  [targetScale._values[0], targetScale._values.at(-1)].map((entry) => ({
+    seconds: entry.time.seconds,
+    value: entry.value
+  })),
+  [
+    { seconds: 5, value: 15 },
+    { seconds: 5.6, value: 100 }
+  ]
+);
+assert.ok(targetScale._interpolationWrites.some((entry) => entry.seconds === 5 && entry.mode === 0));
 
 const audio = parse(api.thomadosFunBox_importAndInsertAudio('C:\\audio\\ui-click.wav'));
 assert.equal(audio.ok, true);

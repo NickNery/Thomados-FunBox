@@ -37,7 +37,7 @@ Reinicie o Premiere e abra `Window > Extensions (Legacy) > Thomados FunBox`.
 ## Módulos
 
 - Editor de curvas: aplica interpolação Bézier e oferece geração de keyframes intermediários.
-- Biblioteca de animações: captura os keyframes reais do clipe selecionado, salva o preset com um nome e reaplica a combinação em outros clipes compatíveis.
-- Biblioteca de áudios: lista, reproduz, importa e insere os WAVs locais no CTI da sequência.
+- Biblioteca de animações: captura os keyframes reais do clipe selecionado, mantém o tempo relativo ao início do clipe e mapeia propriedades como Escala entre vídeos e gráficos.
+- Biblioteca de áudios: permite escolher uma pasta, navegar por subpastas, ouvir os arquivos e inseri-los no CTI da sequência.
 
-Nota: o Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` na API pública CEP. Por isso, velocidade e influência numéricas usam a geração de keyframes intermediários; a ação Bézier direta altera o tipo de interpolação.
+Nota: o Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` nem a leitura dos handles temporais na API pública CEP. Para preservar visualmente uma curva registrada, o painel captura amostras dos valores entre os keyframes e as recria como pontos lineares intermediários.

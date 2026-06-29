@@ -54,8 +54,48 @@ function createPresetId(name: string) {
     .replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
 }
 
-function countKeyframes(preset: CapturedTextAnimationPreset) {
-  return preset.animation.properties.reduce((total, property) => total + property.keyframes.length, 0);
+function countSourceKeyframes(preset: CapturedTextAnimationPreset) {
+  return preset.animation.properties.reduce(
+    (total, property) => total + (property.sourceKeyframeCount ?? property.keyframes.filter((keyframe) => !keyframe.sampled).length),
+    0
+  );
+}
+
+function countSampledKeyframes(preset: CapturedTextAnimationPreset) {
+  return preset.animation.properties.reduce(
+    (total, property) => total + (property.sampledKeyframeCount ?? property.keyframes.filter((keyframe) => keyframe.sampled).length),
+    0
+  );
+}
+
+function getPropertySummary(preset: CapturedTextAnimationPreset) {
+  const labels: Record<string, string> = {
+    scale: 'Escala',
+    position: 'Posição',
+    opacity: 'Opacidade',
+    rotation: 'Rotação',
+    'anchor-point': 'Ponto de ancoragem'
+  };
+  const properties = preset.animation.properties
+    .map((property) => labels[property.semanticKey || ''] || property.propertyDisplayName)
+    .filter((name, index, allNames) => allNames.indexOf(name) === index);
+
+  return properties.join(', ');
+}
+
+function getPresetTiming(preset: CapturedTextAnimationPreset) {
+  const offsets = preset.animation.properties.flatMap((property) =>
+    property.keyframes.filter((keyframe) => !keyframe.sampled).map((keyframe) => keyframe.offsetSeconds)
+  );
+
+  if (offsets.length === 0) {
+    return { start: 0, end: preset.animation.durationSeconds };
+  }
+
+  return {
+    start: Math.min(...offsets),
+    end: Math.max(...offsets)
+  };
 }
 
 export default function TextAnimationGallery({ isApplying, onCapture, onApply }: TextAnimationGalleryProps) {
@@ -93,9 +133,13 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
       setPresets(nextPresets);
       persistPresets(nextPresets);
       setPresetName('');
+      const sampledKeyframes = countSampledKeyframes(preset);
+      const timing = getPresetTiming(preset);
       setFeedback({
         type: 'success',
-        message: `${countKeyframes(preset)} keyframes registrados em “${name}”.`
+        message: `${countSourceKeyframes(preset)} keyframes de ${getPropertySummary(preset)} registrados a partir de ${timing.start.toFixed(2)}s${
+          sampledKeyframes > 0 ? `, com ${sampledKeyframes} amostras da curva` : ''
+        }.`
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -158,13 +202,20 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
       )}
 
       <div className="mt-4 divide-y divide-funbox-line border-y border-funbox-line">
-        {presets.map((preset) => (
+        {presets.map((preset) => {
+          const timing = getPresetTiming(preset);
+          const sampledKeyframes = countSampledKeyframes(preset);
+
+          return (
           <div key={preset.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-zinc-100">{preset.name}</p>
               <p className="mt-1 text-xs text-zinc-400">
-                {preset.animation.properties.length} propriedades · {countKeyframes(preset)} keyframes ·{' '}
-                {preset.animation.durationSeconds.toFixed(2)}s
+                {getPropertySummary(preset)} · {countSourceKeyframes(preset)} keyframes
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">
+                Tempo no clipe: {timing.start.toFixed(2)}s → {timing.end.toFixed(2)}s
+                {sampledKeyframes > 0 ? ` · ${sampledKeyframes} amostras da curva` : ''}
               </p>
               <p className="mt-1 truncate text-xs text-zinc-500">Origem: {preset.animation.sourceClipName}</p>
             </div>
@@ -187,7 +238,8 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {presets.length === 0 && (
           <p className="py-6 text-center text-sm text-zinc-400">Nenhum preset registrado.</p>

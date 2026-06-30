@@ -49,6 +49,8 @@ export type CapturedAnimationProperty = {
   componentMatchName: string;
   componentDisplayName: string;
   componentIndex: number;
+  componentKind?: 'intrinsic' | 'video-effect';
+  componentMatchOrdinal?: number;
   componentRole?: 'motion' | 'vector-motion' | 'opacity' | 'other';
   propertyDisplayName: string;
   propertyIndex: number;
@@ -109,6 +111,8 @@ export type HostApplyResponse = {
   removedKeys?: number;
   unsupportedProperties?: number;
   linearizedKeys?: number;
+  effectsAdded?: number;
+  effectAddFailures?: number;
   target?: 'selection';
   presetName?: string;
   clipName?: string;

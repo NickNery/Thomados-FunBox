@@ -112,6 +112,16 @@ const sourceScale = makeParam(
     return 15 + 85 * progress * progress;
   }
 );
+const sourceEffectScale = makeParam(
+  'Escala',
+  50,
+  [firstPopKey, lastPopKey],
+  [25, 75],
+  (seconds) => {
+    const progress = Math.max(0, Math.min(1, (seconds - sequenceZeroPointSeconds) / 0.6));
+    return 25 + 50 * progress;
+  }
+);
 const sourceClip = {
   name: 'Graphic Clip',
   start: new MockTime(0),
@@ -123,11 +133,18 @@ const sourceClip = {
       matchName: 'AE.ADBE Vector Motion',
       displayName: 'Movimento vetorial',
       properties: collection([sourceScale])
+    },
+    {
+      matchName: 'Vendor.Super Scale',
+      displayName: 'Super Escala',
+      properties: collection([sourceEffectScale])
     }
   ])
 };
 const targetScale = makeParam('Escala', 100, []);
 targetScale.areKeyframesSupported = () => 1;
+const targetEffectScale = makeParam('Escala', 0, []);
+targetEffectScale.areKeyframesSupported = () => 1;
 const targetClip = {
   name: 'Video Clip',
   start: new MockTime(5.875),
@@ -182,6 +199,40 @@ const project = {
   }
 };
 
+const qeEffectDescriptor = {
+  matchName: 'Vendor.Super Scale',
+  displayName: 'Super Escala'
+};
+const qeTargetClip = {
+  name: targetClip.name,
+  start: targetClip.start,
+  end: targetClip.end,
+  addVideoEffect: (effect) => {
+    assert.equal(effect, qeEffectDescriptor);
+    targetClip.components.push({
+      matchName: effect.matchName,
+      displayName: effect.displayName,
+      properties: collection([targetEffectScale])
+    });
+    return true;
+  }
+};
+const qeVideoTrack = {
+  numItems: 1,
+  getItemAt: (index) => (index === 0 ? qeTargetClip : null)
+};
+const qeSequence = {
+  numVideoTracks: 1,
+  getVideoTrackAt: (index) => (index === 0 ? qeVideoTrack : null)
+};
+const qeProject = {
+  getActiveSequence: () => qeSequence,
+  getVideoEffectByName: (name) =>
+    name === qeEffectDescriptor.matchName || name === qeEffectDescriptor.displayName
+      ? qeEffectDescriptor
+      : null
+};
+
 function MockFile(path) {
   this.fsName = String(path);
   this.name = this.fsName.split(/[\\/]/).pop();
@@ -189,8 +240,9 @@ function MockFile(path) {
 }
 
 const context = vm.createContext({
-  app: { name: 'Adobe Premiere Pro', version: '26.2.2', project },
-  $: { global: {} },
+  app: { name: 'Adobe Premiere Pro', version: '26.2.2', project, enableQE: () => true },
+  qe: { project: qeProject },
+  $: { global: {}, sleep: () => {} },
   File: MockFile,
   Time: MockTime,
   Math,
@@ -231,14 +283,15 @@ assert.ok(bake.bakedKeys > 0);
 selectedItems = [sourceClip];
 const capturedAnimation = parse(api.thomadosFunBox_captureTextAnimation());
 assert.equal(capturedAnimation.ok, true);
-assert.equal(capturedAnimation.animation.formatVersion, 4);
+assert.equal(capturedAnimation.animation.formatVersion, 5);
 assert.equal(capturedAnimation.animation.timeBasis, 'clip-offset');
 assert.equal(capturedAnimation.animation.sourceSequenceZeroPointSeconds, 0);
 assert.equal(capturedAnimation.animation.sourceClipStartSeconds, 0);
 assert.ok(Math.abs(capturedAnimation.animation.sourceClipInPointSeconds - sequenceZeroPointSeconds) < 0.000001);
 assert.ok(Math.abs(capturedAnimation.animation.sourceHostStartSeconds - sequenceZeroPointSeconds) < 0.000001);
-assert.equal(capturedAnimation.animation.properties.length, 1);
+assert.equal(capturedAnimation.animation.properties.length, 2);
 assert.equal(capturedAnimation.animation.properties[0].semanticKey, 'scale');
+assert.equal(capturedAnimation.animation.properties[0].componentKind, 'intrinsic');
 assert.equal(capturedAnimation.animation.properties[0].componentRole, 'vector-motion');
 assert.equal(capturedAnimation.animation.properties[0].sourceTimeBasis, 'source-in-point');
 assert.equal(capturedAnimation.animation.properties[0].sourceKeyframeCount, 2);
@@ -246,6 +299,11 @@ assert.equal(capturedAnimation.animation.properties[0].sampledKeyframeCount, 8);
 assert.equal(capturedAnimation.animation.properties[0].curveSampled, true);
 assert.equal(capturedAnimation.animation.properties[0].keyframes[0].offsetSeconds, 0);
 assert.equal(capturedAnimation.animation.properties[0].keyframes.at(-1).offsetSeconds, 0.6);
+assert.equal(capturedAnimation.animation.properties[1].componentKind, 'video-effect');
+assert.equal(capturedAnimation.animation.properties[1].componentMatchName, 'Vendor.Super Scale');
+assert.equal(capturedAnimation.animation.properties[1].componentDisplayName, 'Super Escala');
+assert.equal(capturedAnimation.animation.properties[1].componentMatchOrdinal, 0);
+assert.equal(capturedAnimation.animation.properties[1].semanticKey, '');
 
 selectedItems = [targetClip];
 
@@ -254,7 +312,9 @@ const appliedAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
   animation: capturedAnimation.animation
 }));
 assert.equal(appliedAnimation.ok, true);
-assert.equal(appliedAnimation.applied, 10);
+assert.equal(appliedAnimation.applied, 20);
+assert.equal(appliedAnimation.effectsAdded, 1);
+assert.equal(appliedAnimation.effectAddFailures, 0);
 assert.equal(targetScale._values.length, 10);
 assert.equal(targetScale._values[0].value, 15);
 assert.equal(targetScale._values.at(-1).value, 100);
@@ -265,11 +325,16 @@ assert.ok(
     (entry) => Math.abs(entry.seconds - 4200) < 0.000001 && entry.mode === 0
   )
 );
+assert.equal(targetEffectScale._values.length, 10);
+assert.equal(targetEffectScale._values[0].value, 25);
+assert.equal(targetEffectScale._values.at(-1).value, 75);
+assert.equal(targetClip.components.at(-1).matchName, 'Vendor.Super Scale');
+assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes('QE TrackItem.addVideoEffect()')));
 assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes("Mapeamento: origem='Escala'")));
 
 const legacyAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
   presetName: 'Preset antigo',
-  animation: { ...capturedAnimation.animation, formatVersion: 3, timeBasis: 'clip-offset' }
+  animation: { ...capturedAnimation.animation, formatVersion: 4, timeBasis: 'clip-offset' }
 }));
 assert.equal(legacyAnimation.ok, false);
 assert.match(legacyAnimation.message, /versão anterior/i);

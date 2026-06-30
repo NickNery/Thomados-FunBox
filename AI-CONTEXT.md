@@ -29,6 +29,7 @@ Fluxo:
 
 - Editor de curvas: concluído.
 - Biblioteca de animações capturadas: concluída.
+- Captura e adição automática de efeitos de vídeo: concluída.
 - Biblioteca de áudios: concluída.
 - Compatibilidade com Premiere Pro 26.2.2: concluída.
 - Instalador CEP para Windows: concluído.
@@ -43,12 +44,16 @@ Fluxo atual:
 3. Digita um nome e usa `Registrar keyframes`.
 4. O host percorre os componentes e parâmetros animados do clipe.
 5. O host lê tempos prioritariamente por `.ticks`, avalia `TrackItem.inPoint`, `Sequence.zeroPoint + TrackItem.start` e zero local, e escolhe a base que mantém os keyframes dentro da duração do clipe.
-6. Propriedades conhecidas, como Escala, Posição e Opacidade, recebem uma identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
-7. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
-8. O preset é salvo em LocalStorage.
-9. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
+6. Componentes intrínsecos e efeitos de vídeo são separados. Propriedades intrínsecas conhecidas recebem identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
+7. Efeitos nativos e de terceiros são registrados por `matchName`, `displayName` e ocorrência. Se estiverem ausentes no destino, o host tenta adicioná-los e confirma sua presença antes de mapear os parâmetros.
+8. No CEP, a inclusão usa métodos públicos detectados em runtime quando disponíveis e o QE DOM como fallback específico do Premiere Pro 26.2.2.
+9. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
+10. O preset é salvo em LocalStorage.
+11. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
 
-O formato atual dos presets é a versão `4`, com `timeBasis: "clip-offset"`. Ele armazena zero point, start, inPoint e a base temporal detectada. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
+O formato atual dos presets é a versão `5`, com `timeBasis: "clip-offset"`. Ele armazena zero point, start, inPoint, a base temporal detectada e a identidade dos efeitos. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
+
+Plugins de terceiros precisam estar instalados e carregados no computador de destino. Falhas de descoberta, localização QE, adição e mapeamento ficam registradas no diagnóstico.
 
 O formato TypeScript principal é `CapturedTextAnimationPreset`, definido em `src/cep/bridge.ts`.
 
@@ -78,4 +83,4 @@ Todas as chamadas ao host geram registros com payload, resposta, avisos e decis�
 
 ## Próximos Passos
 
-Executar um smoke test no Premiere com um novo preset de pop-in de Escala e, em caso de falha, analisar o arquivo de diagnóstico gerado pelo painel.
+Executar um smoke test no Premiere com presets de Transformar, Desfoque Gaussiano e um plugin de terceiros instalado.

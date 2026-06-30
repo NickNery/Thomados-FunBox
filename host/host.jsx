@@ -1,4 +1,4 @@
-/* global app, $, File, Time */
+/* global app, $, File, Time, qe */
 
 (function () {
     var KF_INTERP_MODE_LINEAR = 0;
@@ -627,6 +627,9 @@
         var components = collectionToArray(trackItem && trackItem.components);
         var componentIndex;
         var component;
+        var componentKind;
+        var componentMatchName;
+        var componentMatchOrdinal;
         var properties;
         var propertyNames;
         var propertyIndex;
@@ -688,6 +691,61 @@
         }
 
         return "other";
+    }
+
+    function getComponentKind(component) {
+        var matchName = normalizeIdentifier(getComponentString(component, "matchName", ""));
+        var displayName = normalizeIdentifier(getComponentString(component, "displayName", ""));
+
+        if (
+            matchName === "ae adbe motion"
+            || matchName === "ae adbe vector motion"
+            || matchName === "ae adbe opacity"
+            || matchName === "ae adbe time remapping"
+            || matchName === "ae adbe volume"
+            || matchName === "ae adbe pan"
+            || matchName === "ae adbe audio channel volume"
+            || matchName === "ae adbe text properties"
+        ) {
+            return "intrinsic";
+        }
+
+        if (
+            !matchName
+            && (
+                displayName === "motion"
+                || displayName === "movimento"
+                || displayName === "vector motion"
+                || displayName === "movimento vetorial"
+                || displayName === "opacity"
+                || displayName === "opacidade"
+            )
+        ) {
+            return "intrinsic";
+        }
+
+        return "video-effect";
+    }
+
+    function getComponentMatchOrdinal(components, componentIndex, matchName) {
+        var normalizedMatchName = normalizeIdentifier(matchName);
+        var ordinal = 0;
+        var index;
+
+        if (!normalizedMatchName) {
+            return 0;
+        }
+
+        for (index = 0; index < componentIndex; index += 1) {
+            if (
+                normalizeIdentifier(getComponentString(components[index], "matchName", ""))
+                === normalizedMatchName
+            ) {
+                ordinal += 1;
+            }
+        }
+
+        return ordinal;
     }
 
     function getPropertySemanticKey(propertyOrName) {
@@ -779,10 +837,6 @@
 
         if (!property && preferredComponentRole === "motion") {
             property = findSemanticPropertyInRole(components, semanticKey, "vector-motion");
-        }
-
-        if (!property) {
-            property = findSemanticPropertyInRole(components, semanticKey, null);
         }
 
         return property;
@@ -1677,6 +1731,9 @@
 
         for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
             component = components[componentIndex];
+            componentKind = getComponentKind(component);
+            componentMatchName = getComponentString(component, "matchName", "");
+            componentMatchOrdinal = getComponentMatchOrdinal(components, componentIndex, componentMatchName);
             properties = collectionToArray(component.properties);
             result.components += 1;
 
@@ -1723,13 +1780,15 @@
                         result.keys += sampledKeyframes.length;
                         capturedKeyframes = sortCapturedKeyframes(capturedKeyframes.concat(sampledKeyframes));
                         capturedProperties.push({
-                            componentMatchName: getComponentString(component, "matchName", ""),
+                            componentMatchName: componentMatchName,
                             componentDisplayName: getComponentString(component, "displayName", "Componente"),
                             componentIndex: componentIndex,
+                            componentKind: componentKind,
+                            componentMatchOrdinal: componentMatchOrdinal,
                             componentRole: getComponentRole(component),
                             propertyDisplayName: getPropertyName(property, "Parâmetro"),
                             propertyIndex: propertyIndex,
-                            semanticKey: getPropertySemanticKey(property),
+                            semanticKey: componentKind === "intrinsic" ? getPropertySemanticKey(property) : "",
                             sourceTimeBasis: propertyTimeBasis,
                             sourceTimeBaseSeconds: sourceTimeBaseSeconds,
                             sourceKeyframeCount: capturedKeyframes.length - sampledKeyframes.length,
@@ -1742,9 +1801,15 @@
                             result,
                             "Capturado '"
                             + getPropertyName(property, "Parâmetro")
-                            + "' como '"
-                            + getPropertySemanticKey(property)
-                            + "', base="
+                            + "' no componente '"
+                            + getComponentString(component, "displayName", "Componente")
+                            + "' (matchName='"
+                            + componentMatchName
+                            + "', tipo="
+                            + componentKind
+                            + ", ocorrência="
+                            + componentMatchOrdinal
+                            + "), base="
                             + propertyTimeBasis
                             + ", primeiro offset="
                             + capturedKeyframes[0].offsetSeconds
@@ -1770,7 +1835,7 @@
         }
 
         result.animation = {
-            formatVersion: 4,
+            formatVersion: 5,
             sourceClipName: result.clipName,
             sourceSequenceZeroPointSeconds: sequenceZeroPointSeconds,
             sourceClipStartSeconds: clipStartSeconds,
@@ -1795,6 +1860,8 @@
         var components = collectionToArray(trackItem.components);
         var targetMatchName = normalizeIdentifier(capturedProperty.componentMatchName);
         var targetDisplayName = normalizeIdentifier(capturedProperty.componentDisplayName);
+        var targetOrdinal = Math.max(0, numberValue(capturedProperty.componentMatchOrdinal, 0));
+        var matchOrdinal = 0;
         var index;
         var component;
 
@@ -1802,8 +1869,16 @@
             component = components[index];
 
             if (targetMatchName && normalizeIdentifier(getComponentString(component, "matchName", "")) === targetMatchName) {
-                return component;
+                if (matchOrdinal === targetOrdinal) {
+                    return component;
+                }
+
+                matchOrdinal += 1;
             }
+        }
+
+        if (capturedProperty.componentKind === "video-effect" && targetMatchName) {
+            return null;
         }
 
         for (index = 0; index < components.length; index += 1) {
@@ -1817,10 +1892,31 @@
         return getCollectionItem(components, Number(capturedProperty.componentIndex));
     }
 
-    function findCapturedProperty(trackItem, capturedProperty) {
-        var semanticKey = capturedProperty.semanticKey || getPropertySemanticKey(capturedProperty.propertyDisplayName);
+    function countCapturedComponents(trackItem, capturedProperty) {
+        var components = collectionToArray(trackItem.components);
+        var targetMatchName = normalizeIdentifier(capturedProperty.componentMatchName);
+        var count = 0;
+        var index;
+
+        for (index = 0; index < components.length; index += 1) {
+            if (
+                targetMatchName
+                && normalizeIdentifier(getComponentString(components[index], "matchName", "")) === targetMatchName
+            ) {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    function findCapturedProperty(trackItem, capturedProperty, capturedComponent) {
+        var isIntrinsic = capturedProperty.componentKind !== "video-effect";
+        var semanticKey = isIntrinsic
+            ? capturedProperty.semanticKey || getPropertySemanticKey(capturedProperty.propertyDisplayName)
+            : "";
         var property;
-        var component;
+        var component = capturedComponent || findCapturedComponent(trackItem, capturedProperty);
         var properties;
         var targetName = normalizeIdentifier(capturedProperty.propertyDisplayName);
         var index;
@@ -1833,7 +1929,6 @@
             }
         }
 
-        component = findCapturedComponent(trackItem, capturedProperty);
         properties = collectionToArray(component && component.properties);
 
         for (index = 0; index < properties.length; index += 1) {
@@ -1843,6 +1938,310 @@
         }
 
         return getCollectionItem(properties, Number(capturedProperty.propertyIndex));
+    }
+
+    function sleepForHostRefresh() {
+        try {
+            if ($ && typeof $.sleep === "function") {
+                $.sleep(150);
+            }
+        } catch (error) {
+            // The next component lookup still verifies whether the effect appeared.
+        }
+    }
+
+    function getQeNumericProperty(owner, propertyName) {
+        var value;
+
+        try {
+            value = owner[propertyName];
+            value = typeof value === "function" ? value.call(owner) : value;
+            value = Number(value);
+            return isFinite(value) ? value : 0;
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    function getQeItemAt(owner, methodName, index) {
+        try {
+            return owner && typeof owner[methodName] === "function" ? owner[methodName](index) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function getObjectIdentifier(owner, propertyName) {
+        try {
+            return owner && owner[propertyName] !== undefined && owner[propertyName] !== null
+                ? String(owner[propertyName])
+                : "";
+        } catch (error) {
+            return "";
+        }
+    }
+
+    function findQeTrackItem(sequence, trackItem, result) {
+        var qeSequence;
+        var trackCount;
+        var trackIndex;
+        var qeTrack;
+        var itemCount;
+        var itemIndex;
+        var qeItem;
+        var targetNodeId = getObjectIdentifier(trackItem, "nodeId");
+        var targetName = normalizeIdentifier(getObjectIdentifier(trackItem, "name"));
+        var targetStart = getTrackItemTimeSeconds(trackItem, "start");
+        var targetEnd = getTrackItemTimeSeconds(trackItem, "end");
+        var targetDuration = getTrackItemDurationSeconds(trackItem);
+        var sequenceZeroPoint = getSequenceZeroPointSeconds(sequence);
+        var qeStart;
+        var qeEnd;
+        var qeDuration;
+        var qeNodeId;
+        var qeName;
+        var score;
+        var bestScore = -1;
+        var bestItem = null;
+
+        try {
+            app.enableQE();
+        } catch (enableError) {
+            addDiagnostic(result, "QE: app.enableQE() falhou: " + enableError);
+            return null;
+        }
+
+        try {
+            if (typeof qe === "undefined" || !qe.project || typeof qe.project.getActiveSequence !== "function") {
+                addDiagnostic(result, "QE: projeto ou sequência ativa indisponível.");
+                return null;
+            }
+
+            qeSequence = qe.project.getActiveSequence();
+        } catch (sequenceError) {
+            addDiagnostic(result, "QE: falha ao obter a sequência ativa: " + sequenceError);
+            return null;
+        }
+
+        if (!qeSequence) {
+            addDiagnostic(result, "QE: nenhuma sequência ativa foi retornada.");
+            return null;
+        }
+
+        trackCount = getQeNumericProperty(qeSequence, "numVideoTracks");
+
+        for (trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
+            qeTrack = getQeItemAt(qeSequence, "getVideoTrackAt", trackIndex);
+            itemCount = getQeNumericProperty(qeTrack, "numItems");
+
+            for (itemIndex = 0; itemIndex < itemCount; itemIndex += 1) {
+                qeItem = getQeItemAt(qeTrack, "getItemAt", itemIndex);
+
+                if (!qeItem || typeof qeItem.addVideoEffect !== "function") {
+                    continue;
+                }
+
+                qeNodeId = getObjectIdentifier(qeItem, "nodeId");
+                qeName = normalizeIdentifier(getObjectIdentifier(qeItem, "name"));
+                qeStart = getTrackItemTimeSeconds(qeItem, "start");
+                qeEnd = getTrackItemTimeSeconds(qeItem, "end");
+                qeDuration = isFinite(qeStart) && isFinite(qeEnd) ? qeEnd - qeStart : NaN;
+                score = 0;
+
+                if (targetNodeId && qeNodeId && targetNodeId === qeNodeId) {
+                    score += 100;
+                }
+
+                if (targetName && qeName === targetName) {
+                    score += 4;
+                }
+
+                if (
+                    isFinite(qeStart)
+                    && (
+                        Math.abs(qeStart - targetStart) < 0.002
+                        || Math.abs(qeStart - (sequenceZeroPoint + targetStart)) < 0.002
+                    )
+                ) {
+                    score += 8;
+                }
+
+                if (
+                    isFinite(qeEnd)
+                    && (
+                        Math.abs(qeEnd - targetEnd) < 0.002
+                        || Math.abs(qeEnd - (sequenceZeroPoint + targetEnd)) < 0.002
+                    )
+                ) {
+                    score += 4;
+                }
+
+                if (isFinite(qeDuration) && Math.abs(qeDuration - targetDuration) < 0.002) {
+                    score += 3;
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestItem = qeItem;
+                }
+            }
+        }
+
+        if (bestScore < 11) {
+            addDiagnostic(
+                result,
+                "QE: clipe não localizado com segurança (melhor pontuação=" + bestScore + ", nome='" + targetName + "')."
+            );
+            return null;
+        }
+
+        addDiagnostic(result, "QE: clipe de destino localizado (pontuação=" + bestScore + ").");
+        return bestItem;
+    }
+
+    function findQeVideoEffectDescriptor(capturedProperty, result) {
+        var candidates = [capturedProperty.componentMatchName, capturedProperty.componentDisplayName];
+        var candidateIndex;
+        var candidate;
+        var descriptor;
+
+        try {
+            app.enableQE();
+
+            if (typeof qe === "undefined" || !qe.project || typeof qe.project.getVideoEffectByName !== "function") {
+                addDiagnostic(result, "QE: getVideoEffectByName() não está disponível.");
+                return null;
+            }
+        } catch (enableError) {
+            addDiagnostic(result, "QE: não foi possível habilitar a busca de efeitos: " + enableError);
+            return null;
+        }
+
+        for (candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+            candidate = String(candidates[candidateIndex] || "");
+
+            if (!candidate) {
+                continue;
+            }
+
+            try {
+                descriptor = qe.project.getVideoEffectByName(candidate);
+
+                if (descriptor) {
+                    addDiagnostic(result, "QE: efeito resolvido por '" + candidate + "'.");
+                    return descriptor;
+                }
+            } catch (lookupError) {
+                addDiagnostic(result, "QE: busca do efeito por '" + candidate + "' falhou: " + lookupError);
+            }
+        }
+
+        addDiagnostic(
+            result,
+            "QE: efeito não encontrado por matchName='"
+            + (capturedProperty.componentMatchName || "")
+            + "' ou displayName='"
+            + (capturedProperty.componentDisplayName || "")
+            + "'."
+        );
+        return null;
+    }
+
+    function invokeEffectAddition(owner, methodName, effectArgument, label, result) {
+        try {
+            if (!owner || typeof owner[methodName] !== "function") {
+                return false;
+            }
+
+            owner[methodName](effectArgument);
+            sleepForHostRefresh();
+            addDiagnostic(result, "Adição de efeito tentada via " + label + ".");
+            return true;
+        } catch (error) {
+            addDiagnostic(result, "Adição de efeito via " + label + " falhou: " + error);
+            return false;
+        }
+    }
+
+    function ensureCapturedComponent(sequence, trackItem, capturedProperty, result) {
+        var component = findCapturedComponent(trackItem, capturedProperty);
+        var effectDescriptor;
+        var effectArgument;
+        var qeTrackItem;
+        var requiredCount;
+        var currentCount;
+        var initialCount;
+        var addIndex;
+
+        if (component || capturedProperty.componentKind !== "video-effect") {
+            return component;
+        }
+
+        addDiagnostic(
+            result,
+            "Efeito ausente: '"
+            + (capturedProperty.componentDisplayName || "Efeito")
+            + "' (matchName='"
+            + (capturedProperty.componentMatchName || "")
+            + "', ocorrência="
+            + numberValue(capturedProperty.componentMatchOrdinal, 0)
+            + ")."
+        );
+        initialCount = countCapturedComponents(trackItem, capturedProperty);
+        effectDescriptor = findQeVideoEffectDescriptor(capturedProperty, result);
+        effectArgument = effectDescriptor
+            || capturedProperty.componentMatchName
+            || capturedProperty.componentDisplayName;
+
+        if (invokeEffectAddition(trackItem.components, "addVideoEffect", effectArgument, "components.addVideoEffect()", result)) {
+            component = findCapturedComponent(trackItem, capturedProperty);
+
+            if (component) {
+                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
+                return component;
+            }
+        }
+
+        if (invokeEffectAddition(trackItem, "addVideoEffect", effectArgument, "TrackItem.addVideoEffect()", result)) {
+            component = findCapturedComponent(trackItem, capturedProperty);
+
+            if (component) {
+                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
+                return component;
+            }
+        }
+
+        if (!effectDescriptor) {
+            result.effectAddFailures += 1;
+            addDiagnostic(result, "QE: sem descritor de efeito para executar o fallback addVideoEffect().");
+            return null;
+        }
+
+        qeTrackItem = findQeTrackItem(sequence, trackItem, result);
+
+        requiredCount = Math.max(1, numberValue(capturedProperty.componentMatchOrdinal, 0) + 1);
+        currentCount = countCapturedComponents(trackItem, capturedProperty);
+
+        for (addIndex = currentCount; addIndex < requiredCount; addIndex += 1) {
+            if (!invokeEffectAddition(qeTrackItem, "addVideoEffect", effectDescriptor, "QE TrackItem.addVideoEffect()", result)) {
+                break;
+            }
+
+            component = findCapturedComponent(trackItem, capturedProperty);
+
+            if (component) {
+                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
+                addDiagnostic(
+                    result,
+                    "Efeito adicionado e confirmado: matchName='" + capturedProperty.componentMatchName + "'."
+                );
+                return component;
+            }
+        }
+
+        result.effectAddFailures += 1;
+        addDiagnostic(result, "O efeito não apareceu em TrackItem.components após as tentativas de adição.");
+        return null;
     }
 
     function getTargetPropertyTimeBaseSeconds(capturedProperty, sequence, trackItem) {
@@ -1873,6 +2272,8 @@
             clips: 0,
             properties: 0,
             keys: 0,
+            effectsAdded: 0,
+            effectAddFailures: 0,
             presetName: payload && payload.presetName ? String(payload.presetName) : "Preset",
             animatedProperties: [],
             warnings: [],
@@ -1891,6 +2292,9 @@
         var clipDuration;
         var propertyIndex;
         var capturedProperty;
+        var capturedComponent;
+        var componentResolutionCache = {};
+        var componentResolutionKey;
         var property;
         var keyIndex;
         var capturedKey;
@@ -1906,7 +2310,7 @@
             return result;
         }
 
-        if (Number(animation.formatVersion) !== 4 || animation.timeBasis !== "clip-offset") {
+        if (Number(animation.formatVersion) !== 5 || animation.timeBasis !== "clip-offset") {
             result.message = "Este preset foi registrado por uma versão anterior. Registre-o novamente antes de aplicar.";
             addDiagnostic(
                 result,
@@ -1967,13 +2371,30 @@
 
             for (propertyIndex = 0; propertyIndex < animation.properties.length; propertyIndex += 1) {
                 capturedProperty = animation.properties[propertyIndex];
-                property = findCapturedProperty(trackItem, capturedProperty);
+                componentResolutionKey = clipIndex
+                    + "|"
+                    + normalizeIdentifier(capturedProperty.componentMatchName || capturedProperty.componentDisplayName)
+                    + "|"
+                    + numberValue(capturedProperty.componentMatchOrdinal, 0);
+
+                if (componentResolutionCache.hasOwnProperty(componentResolutionKey)) {
+                    capturedComponent = componentResolutionCache[componentResolutionKey];
+                } else {
+                    capturedComponent = ensureCapturedComponent(sequence, trackItem, capturedProperty, result);
+                    componentResolutionCache[componentResolutionKey] = capturedComponent;
+                }
+
+                property = capturedComponent
+                    ? findCapturedProperty(trackItem, capturedProperty, capturedComponent)
+                    : null;
 
                 if (!property) {
                     result.warnings.push(
                         "O parâmetro "
                         + capturedProperty.propertyDisplayName
-                        + " não existe em "
+                        + " do componente "
+                        + (capturedProperty.componentDisplayName || "desconhecido")
+                        + " não pôde ser localizado em "
                         + (trackItem.name || "um clipe selecionado")
                         + "."
                     );
@@ -1985,6 +2406,8 @@
                         + (capturedProperty.semanticKey || "")
                         + "', componente='"
                         + (capturedProperty.componentDisplayName || "")
+                        + "', matchName='"
+                        + (capturedProperty.componentMatchName || "")
                         + "'."
                     );
                     continue;

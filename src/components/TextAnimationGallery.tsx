@@ -77,7 +77,11 @@ function getPropertySummary(preset: CapturedTextAnimationPreset) {
     'anchor-point': 'Ponto de ancoragem'
   };
   const properties = preset.animation.properties
-    .map((property) => labels[property.semanticKey || ''] || property.propertyDisplayName)
+    .map((property) =>
+      property.componentKind === 'video-effect'
+        ? `${property.componentDisplayName}: ${property.propertyDisplayName}`
+        : labels[property.semanticKey || ''] || property.propertyDisplayName
+    )
     .filter((name, index, allNames) => allNames.indexOf(name) === index);
 
   return properties.join(', ');
@@ -205,7 +209,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
         {presets.map((preset) => {
           const timing = getPresetTiming(preset);
           const sampledKeyframes = countSampledKeyframes(preset);
-          const isCompatible = preset.animation.formatVersion === 4 && preset.animation.timeBasis === 'clip-offset';
+          const isCompatible = preset.animation.formatVersion === 5 && preset.animation.timeBasis === 'clip-offset';
 
           return (
           <div key={preset.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

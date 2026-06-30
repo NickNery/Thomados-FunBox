@@ -99,15 +99,16 @@ function makeParam(
   };
 }
 
-const firstPopKey = new MockTime(25);
-const lastPopKey = new MockTime(25.6);
+const sequenceZeroPointSeconds = 3599.99424;
+const firstPopKey = new MockTime(sequenceZeroPointSeconds + 25);
+const lastPopKey = new MockTime(sequenceZeroPointSeconds + 25.6);
 const sourceScale = makeParam(
   'Escala',
   100,
   [firstPopKey, lastPopKey],
   [15, 100],
   (seconds) => {
-    const progress = Math.max(0, Math.min(1, (seconds - 25) / 0.6));
+    const progress = Math.max(0, Math.min(1, (seconds - sequenceZeroPointSeconds - 25) / 0.6));
     return 15 + 85 * progress * progress;
   }
 );
@@ -159,6 +160,7 @@ const audioTrack = {
 const rootItem = { name: 'Root', children: collection([]) };
 const sequence = {
   name: 'Sequence 01',
+  zeroPoint: String(Math.round(sequenceZeroPointSeconds * TICKS_PER_SECOND)),
   audioTracks: collection([audioTrack]),
   getSelection: () => collection(selectedItems.slice()),
   getPlayerPosition: () => new MockTime(3),
@@ -227,8 +229,10 @@ assert.ok(bake.bakedKeys > 0);
 selectedItems = [sourceClip];
 const capturedAnimation = parse(api.thomadosFunBox_captureTextAnimation());
 assert.equal(capturedAnimation.ok, true);
-assert.equal(capturedAnimation.animation.formatVersion, 2);
+assert.equal(capturedAnimation.animation.formatVersion, 3);
 assert.equal(capturedAnimation.animation.timeBasis, 'clip-offset');
+assert.ok(Math.abs(capturedAnimation.animation.sourceSequenceZeroPointSeconds - sequenceZeroPointSeconds) < 0.000001);
+assert.ok(Math.abs(capturedAnimation.animation.sourceHostStartSeconds - (sequenceZeroPointSeconds + 20)) < 0.000001);
 assert.equal(capturedAnimation.animation.properties.length, 1);
 assert.equal(capturedAnimation.animation.properties[0].semanticKey, 'scale');
 assert.equal(capturedAnimation.animation.properties[0].componentRole, 'vector-motion');
@@ -248,22 +252,20 @@ const appliedAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
 assert.equal(appliedAnimation.ok, true);
 assert.equal(appliedAnimation.applied, 10);
 assert.equal(targetScale._values.length, 10);
-assert.deepEqual(
-  [targetScale._values[0], targetScale._values.at(-1)].map((entry) => ({
-    seconds: entry.time.seconds,
-    value: entry.value
-  })),
-  [
-    { seconds: 105, value: 15 },
-    { seconds: 105.6, value: 100 }
-  ]
+assert.equal(targetScale._values[0].value, 15);
+assert.equal(targetScale._values.at(-1).value, 100);
+assert.ok(Math.abs(targetScale._values[0].time.seconds - (sequenceZeroPointSeconds + 105)) < 0.000001);
+assert.ok(Math.abs(targetScale._values.at(-1).time.seconds - (sequenceZeroPointSeconds + 105.6)) < 0.000001);
+assert.ok(
+  targetScale._interpolationWrites.some(
+    (entry) => Math.abs(entry.seconds - (sequenceZeroPointSeconds + 105)) < 0.000001 && entry.mode === 0
+  )
 );
-assert.ok(targetScale._interpolationWrites.some((entry) => entry.seconds === 105 && entry.mode === 0));
 assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes("Mapeamento: origem='Escala'")));
 
 const legacyAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
   presetName: 'Preset antigo',
-  animation: { ...capturedAnimation.animation, formatVersion: 1, timeBasis: 'clip' }
+  animation: { ...capturedAnimation.animation, formatVersion: 2, timeBasis: 'clip-offset' }
 }));
 assert.equal(legacyAnimation.ok, false);
 assert.match(legacyAnimation.message, /versão anterior/i);

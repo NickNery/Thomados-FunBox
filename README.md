@@ -43,4 +43,4 @@ Reinicie o Premiere e abra `Window > Extensions (Legacy) > Thomados FunBox`.
 
 Nota: o Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` nem a leitura dos handles temporais na API pública CEP. Para preservar visualmente uma curva registrada, o painel captura amostras dos valores entre os keyframes e as recria como pontos lineares intermediários.
 
-Presets registrados antes da versão `1.3.0` devem ser criados novamente para receber a base temporal corrigida.
+Presets registrados antes da versão `1.4.0` devem ser criados novamente para considerar o zero point da sequência e receber a base temporal corrigida.

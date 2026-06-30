@@ -63,7 +63,9 @@ export type CapturedAnimationProperty = {
 export type CapturedTextAnimation = {
   formatVersion?: number;
   sourceClipName: string;
+  sourceSequenceZeroPointSeconds?: number;
   sourceClipStartSeconds?: number;
+  sourceHostStartSeconds?: number;
   sourceClipDurationSeconds?: number;
   durationSeconds: number;
   timeBasis?: 'clip' | 'clip-offset';

@@ -42,13 +42,13 @@ Fluxo atual:
 2. Seleciona o clipe animado na timeline.
 3. Digita um nome e usa `Registrar keyframes`.
 4. O host percorre os componentes e parâmetros animados do clipe.
-5. O host detecta se os tempos retornados pelo `ComponentParam` estão na base da sequência ou do clipe e salva offsets relativos ao início do clipe.
+5. O host calcula a base absoluta como `Sequence.zeroPoint + TrackItem.start`, detecta a base retornada pelo `ComponentParam` e salva offsets relativos ao início do clipe.
 6. Propriedades conhecidas, como Escala, Posição e Opacidade, recebem uma identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
 7. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
 8. O preset é salvo em LocalStorage.
 9. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
 
-O formato atual dos presets é a versão `2`, com `timeBasis: "clip-offset"`. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
+O formato atual dos presets é a versão `3`, com `timeBasis: "clip-offset"`. Ele armazena também o zero point da sequência de origem. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
 
 O formato TypeScript principal é `CapturedTextAnimationPreset`, definido em `src/cep/bridge.ts`.
 

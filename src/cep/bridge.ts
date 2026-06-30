@@ -53,7 +53,8 @@ export type CapturedAnimationProperty = {
   propertyDisplayName: string;
   propertyIndex: number;
   semanticKey?: 'scale' | 'position' | 'opacity' | 'rotation' | 'anchor-point' | '';
-  sourceTimeBasis?: 'sequence' | 'clip-local';
+  sourceTimeBasis?: 'source-in-point' | 'sequence' | 'clip-local' | 'first-key';
+  sourceTimeBaseSeconds?: number;
   sourceKeyframeCount?: number;
   sampledKeyframeCount?: number;
   curveSampled?: boolean;
@@ -65,6 +66,7 @@ export type CapturedTextAnimation = {
   sourceClipName: string;
   sourceSequenceZeroPointSeconds?: number;
   sourceClipStartSeconds?: number;
+  sourceClipInPointSeconds?: number;
   sourceHostStartSeconds?: number;
   sourceClipDurationSeconds?: number;
   durationSeconds: number;

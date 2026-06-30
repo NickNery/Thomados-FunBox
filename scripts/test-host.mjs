@@ -100,23 +100,24 @@ function makeParam(
 }
 
 const sequenceZeroPointSeconds = 3599.99424;
-const firstPopKey = new MockTime(sequenceZeroPointSeconds + 25);
-const lastPopKey = new MockTime(sequenceZeroPointSeconds + 25.6);
+const firstPopKey = new MockTime(sequenceZeroPointSeconds);
+const lastPopKey = new MockTime(sequenceZeroPointSeconds + 0.6);
 const sourceScale = makeParam(
   'Escala',
   100,
   [firstPopKey, lastPopKey],
   [15, 100],
   (seconds) => {
-    const progress = Math.max(0, Math.min(1, (seconds - sequenceZeroPointSeconds - 25) / 0.6));
+    const progress = Math.max(0, Math.min(1, (seconds - sequenceZeroPointSeconds) / 0.6));
     return 15 + 85 * progress * progress;
   }
 );
 const sourceClip = {
   name: 'Graphic Clip',
-  start: new MockTime(20),
-  end: new MockTime(30),
-  duration: new MockTime(10),
+  start: new MockTime(0),
+  inPoint: new MockTime(sequenceZeroPointSeconds),
+  end: new MockTime(5),
+  duration: new MockTime(5),
   components: collection([
     {
       matchName: 'AE.ADBE Vector Motion',
@@ -129,9 +130,10 @@ const targetScale = makeParam('Escala', 100, []);
 targetScale.areKeyframesSupported = () => 1;
 const targetClip = {
   name: 'Video Clip',
-  start: new MockTime(100),
-  end: new MockTime(110),
-  duration: new MockTime(10),
+  start: new MockTime(5.875),
+  inPoint: new MockTime(4200),
+  end: new MockTime(10.875),
+  duration: new MockTime(5),
   components: collection([
     { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([targetScale]) }
   ])
@@ -160,7 +162,7 @@ const audioTrack = {
 const rootItem = { name: 'Root', children: collection([]) };
 const sequence = {
   name: 'Sequence 01',
-  zeroPoint: String(Math.round(sequenceZeroPointSeconds * TICKS_PER_SECOND)),
+  zeroPoint: '0',
   audioTracks: collection([audioTrack]),
   getSelection: () => collection(selectedItems.slice()),
   getPlayerPosition: () => new MockTime(3),
@@ -229,19 +231,21 @@ assert.ok(bake.bakedKeys > 0);
 selectedItems = [sourceClip];
 const capturedAnimation = parse(api.thomadosFunBox_captureTextAnimation());
 assert.equal(capturedAnimation.ok, true);
-assert.equal(capturedAnimation.animation.formatVersion, 3);
+assert.equal(capturedAnimation.animation.formatVersion, 4);
 assert.equal(capturedAnimation.animation.timeBasis, 'clip-offset');
-assert.ok(Math.abs(capturedAnimation.animation.sourceSequenceZeroPointSeconds - sequenceZeroPointSeconds) < 0.000001);
-assert.ok(Math.abs(capturedAnimation.animation.sourceHostStartSeconds - (sequenceZeroPointSeconds + 20)) < 0.000001);
+assert.equal(capturedAnimation.animation.sourceSequenceZeroPointSeconds, 0);
+assert.equal(capturedAnimation.animation.sourceClipStartSeconds, 0);
+assert.ok(Math.abs(capturedAnimation.animation.sourceClipInPointSeconds - sequenceZeroPointSeconds) < 0.000001);
+assert.ok(Math.abs(capturedAnimation.animation.sourceHostStartSeconds - sequenceZeroPointSeconds) < 0.000001);
 assert.equal(capturedAnimation.animation.properties.length, 1);
 assert.equal(capturedAnimation.animation.properties[0].semanticKey, 'scale');
 assert.equal(capturedAnimation.animation.properties[0].componentRole, 'vector-motion');
-assert.equal(capturedAnimation.animation.properties[0].sourceTimeBasis, 'sequence');
+assert.equal(capturedAnimation.animation.properties[0].sourceTimeBasis, 'source-in-point');
 assert.equal(capturedAnimation.animation.properties[0].sourceKeyframeCount, 2);
 assert.equal(capturedAnimation.animation.properties[0].sampledKeyframeCount, 8);
 assert.equal(capturedAnimation.animation.properties[0].curveSampled, true);
-assert.equal(capturedAnimation.animation.properties[0].keyframes[0].offsetSeconds, 5);
-assert.equal(capturedAnimation.animation.properties[0].keyframes.at(-1).offsetSeconds, 5.6);
+assert.equal(capturedAnimation.animation.properties[0].keyframes[0].offsetSeconds, 0);
+assert.equal(capturedAnimation.animation.properties[0].keyframes.at(-1).offsetSeconds, 0.6);
 
 selectedItems = [targetClip];
 
@@ -254,18 +258,18 @@ assert.equal(appliedAnimation.applied, 10);
 assert.equal(targetScale._values.length, 10);
 assert.equal(targetScale._values[0].value, 15);
 assert.equal(targetScale._values.at(-1).value, 100);
-assert.ok(Math.abs(targetScale._values[0].time.seconds - (sequenceZeroPointSeconds + 105)) < 0.000001);
-assert.ok(Math.abs(targetScale._values.at(-1).time.seconds - (sequenceZeroPointSeconds + 105.6)) < 0.000001);
+assert.ok(Math.abs(targetScale._values[0].time.seconds - 4200) < 0.000001);
+assert.ok(Math.abs(targetScale._values.at(-1).time.seconds - 4200.6) < 0.000001);
 assert.ok(
   targetScale._interpolationWrites.some(
-    (entry) => Math.abs(entry.seconds - (sequenceZeroPointSeconds + 105)) < 0.000001 && entry.mode === 0
+    (entry) => Math.abs(entry.seconds - 4200) < 0.000001 && entry.mode === 0
   )
 );
 assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes("Mapeamento: origem='Escala'")));
 
 const legacyAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({
   presetName: 'Preset antigo',
-  animation: { ...capturedAnimation.animation, formatVersion: 2, timeBasis: 'clip-offset' }
+  animation: { ...capturedAnimation.animation, formatVersion: 3, timeBasis: 'clip-offset' }
 }));
 assert.equal(legacyAnimation.ok, false);
 assert.match(legacyAnimation.message, /versão anterior/i);

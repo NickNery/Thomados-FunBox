@@ -323,16 +323,16 @@
         var ticks;
         var parsed;
 
-        if (time && typeof time.seconds === "number" && isFinite(time.seconds)) {
-            return time.seconds;
-        }
-
         if (time && time.ticks !== undefined) {
             ticks = Number(time.ticks);
 
             if (isFinite(ticks)) {
                 return ticks / TICKS_PER_SECOND;
             }
+        }
+
+        if (time && typeof time.seconds === "number" && isFinite(time.seconds)) {
+            return time.seconds;
         }
 
         parsed = Number(time);
@@ -355,6 +355,29 @@
 
         ticks = Number(zeroPoint);
         return isFinite(ticks) ? ticks / TICKS_PER_SECOND : 0;
+    }
+
+    function getTrackItemTimeSeconds(trackItem, propertyName) {
+        var time;
+
+        if (!trackItem) {
+            return 0;
+        }
+
+        try {
+            time = trackItem[propertyName];
+            return timeToSeconds(time);
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    function getTimeTicksString(time) {
+        try {
+            return time && time.ticks !== undefined ? String(time.ticks) : "indisponível";
+        } catch (error) {
+            return "indisponível";
+        }
     }
 
     function createTimeFromSeconds(seconds) {
@@ -547,23 +570,46 @@
         return keyframes;
     }
 
-    function detectPropertyTimeBasis(sortedKeys, clipHostStartSeconds, clipDuration) {
+    function keyRangeFitsBase(firstSeconds, lastSeconds, baseSeconds, clipDuration) {
+        return isFinite(baseSeconds)
+            && firstSeconds >= baseSeconds - 0.05
+            && (clipDuration <= 0 || lastSeconds <= baseSeconds + clipDuration + 0.05);
+    }
+
+    function detectPropertyTimeBasis(sortedKeys, timing, clipDuration) {
         var firstSeconds = timeToSeconds(sortedKeys[0]);
         var lastSeconds = timeToSeconds(sortedKeys[sortedKeys.length - 1]);
-        var sequenceTimeIsValid = firstSeconds >= clipHostStartSeconds - 0.05
-            && (clipDuration <= 0 || lastSeconds <= clipHostStartSeconds + clipDuration + 0.05);
-        var clipTimeIsValid = firstSeconds >= -0.05
-            && (clipDuration <= 0 || lastSeconds <= clipDuration + 0.05);
+        var sourceTimeIsValid = keyRangeFitsBase(
+            firstSeconds,
+            lastSeconds,
+            timing.clipInPointSeconds,
+            clipDuration
+        );
+        var sequenceTimeIsValid = keyRangeFitsBase(
+            firstSeconds,
+            lastSeconds,
+            timing.sequenceHostStartSeconds,
+            clipDuration
+        );
+        var clipTimeIsValid = keyRangeFitsBase(firstSeconds, lastSeconds, 0, clipDuration);
+
+        if (sourceTimeIsValid && Math.abs(timing.clipInPointSeconds) > 0.05) {
+            return { name: "source-in-point", baseSeconds: timing.clipInPointSeconds };
+        }
 
         if (sequenceTimeIsValid) {
-            return "sequence";
+            return { name: "sequence", baseSeconds: timing.sequenceHostStartSeconds };
         }
 
         if (clipTimeIsValid) {
-            return "clip-local";
+            return { name: "clip-local", baseSeconds: 0 };
         }
 
-        return "sequence";
+        if (sourceTimeIsValid) {
+            return { name: "source-in-point", baseSeconds: timing.clipInPointSeconds };
+        }
+
+        return { name: "first-key", baseSeconds: firstSeconds };
     }
 
     function addDiagnostic(result, message) {
@@ -1550,6 +1596,8 @@
         var sequenceZeroPointSeconds;
         var clipStartSeconds;
         var clipHostStartSeconds;
+        var clipInPointSeconds;
+        var timing;
         var clipDuration;
         var components;
         var componentIndex;
@@ -1567,6 +1615,7 @@
         var sampledKeyframes;
         var propertyTimeBasis;
         var sourceTimeBaseSeconds;
+        var timeDetection;
         var capturedProperties = [];
         var maxOffset = 0;
 
@@ -1593,8 +1642,13 @@
 
         result.clipName = trackItem.name || "Clipe selecionado";
         sequenceZeroPointSeconds = getSequenceZeroPointSeconds(sequence);
-        clipStartSeconds = timeToSeconds(getTrackItemStartTime(trackItem, sequence));
+        clipStartSeconds = getTrackItemTimeSeconds(trackItem, "start");
         clipHostStartSeconds = sequenceZeroPointSeconds + clipStartSeconds;
+        clipInPointSeconds = getTrackItemTimeSeconds(trackItem, "inPoint");
+        timing = {
+            clipInPointSeconds: clipInPointSeconds,
+            sequenceHostStartSeconds: clipHostStartSeconds
+        };
         clipDuration = getTrackItemDurationSeconds(trackItem);
         components = collectionToArray(trackItem.components);
         addDiagnostic(
@@ -1607,7 +1661,15 @@
             + clipStartSeconds
             + "s base host="
             + clipHostStartSeconds
-            + "s duração="
+            + "s inPoint="
+            + clipInPointSeconds
+            + "s ticks(zeroPoint/start/inPoint)="
+            + String(sequence.zeroPoint)
+            + "/"
+            + getTimeTicksString(trackItem.start)
+            + "/"
+            + getTimeTicksString(trackItem.inPoint)
+            + " duração="
             + clipDuration
             + "s."
         );
@@ -1629,8 +1691,9 @@
                         continue;
                     }
 
-                    propertyTimeBasis = detectPropertyTimeBasis(sortedKeys, clipHostStartSeconds, clipDuration);
-                    sourceTimeBaseSeconds = propertyTimeBasis === "sequence" ? clipHostStartSeconds : 0;
+                    timeDetection = detectPropertyTimeBasis(sortedKeys, timing, clipDuration);
+                    propertyTimeBasis = timeDetection.name;
+                    sourceTimeBaseSeconds = timeDetection.baseSeconds;
                     capturedKeyframes = [];
 
                     for (keyIndex = 0; keyIndex < sortedKeys.length; keyIndex += 1) {
@@ -1668,6 +1731,7 @@
                             propertyIndex: propertyIndex,
                             semanticKey: getPropertySemanticKey(property),
                             sourceTimeBasis: propertyTimeBasis,
+                            sourceTimeBaseSeconds: sourceTimeBaseSeconds,
                             sourceKeyframeCount: capturedKeyframes.length - sampledKeyframes.length,
                             sampledKeyframeCount: sampledKeyframes.length,
                             curveSampled: sampledKeyframes.length > 0,
@@ -1706,11 +1770,12 @@
         }
 
         result.animation = {
-            formatVersion: 3,
+            formatVersion: 4,
             sourceClipName: result.clipName,
             sourceSequenceZeroPointSeconds: sequenceZeroPointSeconds,
             sourceClipStartSeconds: clipStartSeconds,
-            sourceHostStartSeconds: clipHostStartSeconds,
+            sourceClipInPointSeconds: clipInPointSeconds,
+            sourceHostStartSeconds: capturedProperties[0].sourceTimeBaseSeconds,
             sourceClipDurationSeconds: clipDuration,
             durationSeconds: maxOffset,
             timeBasis: "clip-offset",
@@ -1780,6 +1845,26 @@
         return getCollectionItem(properties, Number(capturedProperty.propertyIndex));
     }
 
+    function getTargetPropertyTimeBaseSeconds(capturedProperty, sequence, trackItem) {
+        var clipInPointSeconds = getTrackItemTimeSeconds(trackItem, "inPoint");
+        var sequenceBaseSeconds = getSequenceZeroPointSeconds(sequence)
+            + getTrackItemTimeSeconds(trackItem, "start");
+
+        if (capturedProperty.sourceTimeBasis === "source-in-point") {
+            return clipInPointSeconds;
+        }
+
+        if (capturedProperty.sourceTimeBasis === "sequence") {
+            return sequenceBaseSeconds;
+        }
+
+        if (capturedProperty.sourceTimeBasis === "clip-local") {
+            return 0;
+        }
+
+        return Math.abs(clipInPointSeconds) > 0.05 ? clipInPointSeconds : sequenceBaseSeconds;
+    }
+
     function applyCapturedTextAnimation(payload) {
         var result = {
             ok: false,
@@ -1801,6 +1886,7 @@
         var targetSequenceZeroPointSeconds;
         var targetStartSeconds;
         var targetHostStartSeconds;
+        var targetClipInPointSeconds;
         var targetTimeBaseSeconds;
         var clipDuration;
         var propertyIndex;
@@ -1820,7 +1906,7 @@
             return result;
         }
 
-        if (Number(animation.formatVersion) !== 3 || animation.timeBasis !== "clip-offset") {
+        if (Number(animation.formatVersion) !== 4 || animation.timeBasis !== "clip-offset") {
             result.message = "Este preset foi registrado por uma versão anterior. Registre-o novamente antes de aplicar.";
             addDiagnostic(
                 result,
@@ -1851,8 +1937,9 @@
 
         for (clipIndex = 0; clipIndex < selection.length; clipIndex += 1) {
             trackItem = selection[clipIndex];
-            targetStartSeconds = timeToSeconds(getTrackItemStartTime(trackItem, sequence));
+            targetStartSeconds = getTrackItemTimeSeconds(trackItem, "start");
             targetHostStartSeconds = targetSequenceZeroPointSeconds + targetStartSeconds;
+            targetClipInPointSeconds = getTrackItemTimeSeconds(trackItem, "inPoint");
             clipDuration = getTrackItemDurationSeconds(trackItem);
             addDiagnostic(
                 result,
@@ -1864,7 +1951,15 @@
                 + targetStartSeconds
                 + "s base host="
                 + targetHostStartSeconds
-                + "s duração="
+                + "s inPoint="
+                + targetClipInPointSeconds
+                + "s ticks(zeroPoint/start/inPoint)="
+                + String(sequence.zeroPoint)
+                + "/"
+                + getTimeTicksString(trackItem.start)
+                + "/"
+                + getTimeTicksString(trackItem.inPoint)
+                + " duração="
                 + clipDuration
                 + "s."
             );
@@ -1910,7 +2005,17 @@
                     continue;
                 }
 
-                targetTimeBaseSeconds = capturedProperty.sourceTimeBasis === "clip-local" ? 0 : targetHostStartSeconds;
+                targetTimeBaseSeconds = getTargetPropertyTimeBaseSeconds(capturedProperty, sequence, trackItem);
+                addDiagnostic(
+                    result,
+                    "Base temporal do destino para '"
+                    + capturedProperty.propertyDisplayName
+                    + "': modo="
+                    + capturedProperty.sourceTimeBasis
+                    + ", base="
+                    + targetTimeBaseSeconds
+                    + "s."
+                );
 
                 for (keyIndex = 0; keyIndex < capturedProperty.keyframes.length; keyIndex += 1) {
                     capturedKey = capturedProperty.keyframes[keyIndex];

@@ -205,7 +205,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
         {presets.map((preset) => {
           const timing = getPresetTiming(preset);
           const sampledKeyframes = countSampledKeyframes(preset);
-          const isCompatible = preset.animation.formatVersion === 3 && preset.animation.timeBasis === 'clip-offset';
+          const isCompatible = preset.animation.formatVersion === 4 && preset.animation.timeBasis === 'clip-offset';
 
           return (
           <div key={preset.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

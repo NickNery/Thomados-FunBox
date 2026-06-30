@@ -205,6 +205,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
         {presets.map((preset) => {
           const timing = getPresetTiming(preset);
           const sampledKeyframes = countSampledKeyframes(preset);
+          const isCompatible = preset.animation.formatVersion === 2 && preset.animation.timeBasis === 'clip-offset';
 
           return (
           <div key={preset.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -218,12 +219,15 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
                 {sampledKeyframes > 0 ? ` · ${sampledKeyframes} amostras da curva` : ''}
               </p>
               <p className="mt-1 truncate text-xs text-zinc-500">Origem: {preset.animation.sourceClipName}</p>
+              {!isCompatible && (
+                <p className="mt-2 text-xs font-semibold text-amber-300">Registre novamente este preset.</p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => onApply({ presetName: preset.name, animation: preset.animation })}
-                disabled={isApplying || isCapturing}
+                disabled={isApplying || isCapturing || !isCompatible}
                 className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isApplying ? 'Aplicando...' : 'Aplicar'}

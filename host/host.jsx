@@ -462,7 +462,7 @@
         return true;
     }
 
-    function samplePropertyCurve(property, keyframes) {
+    function samplePropertyCurve(property, keyframes, sourceTimeBaseSeconds) {
         var samples = [];
         var intervalIndex;
         var startKey;
@@ -490,7 +490,7 @@
 
             startSeconds = startKey.offsetSeconds;
             endSeconds = endKey.offsetSeconds;
-            duration = endSeconds - startSeconds;
+            duration = Math.round((endSeconds - startSeconds) * 1000000) / 1000000;
 
             if (!isFinite(duration) || duration <= 0) {
                 continue;
@@ -500,7 +500,7 @@
 
             for (sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
                 sampleSeconds = startSeconds + duration * sampleIndex / (sampleCount + 1);
-                sampleTime = createTimeFromSeconds(sampleSeconds);
+                sampleTime = createTimeFromSeconds(sampleSeconds + sourceTimeBaseSeconds);
 
                 try {
                     sampleValue = property.getValueAtTime(sampleTime);
@@ -527,6 +527,69 @@
             return left.offsetSeconds - right.offsetSeconds;
         });
         return keyframes;
+    }
+
+    function detectPropertyTimeBasis(sortedKeys, clipStartSeconds, clipDuration) {
+        var firstSeconds = timeToSeconds(sortedKeys[0]);
+        var lastSeconds = timeToSeconds(sortedKeys[sortedKeys.length - 1]);
+        var sequenceTimeIsValid = firstSeconds >= clipStartSeconds - 0.05
+            && (clipDuration <= 0 || lastSeconds <= clipStartSeconds + clipDuration + 0.05);
+        var clipTimeIsValid = firstSeconds >= -0.05
+            && (clipDuration <= 0 || lastSeconds <= clipDuration + 0.05);
+
+        if (sequenceTimeIsValid) {
+            return "sequence";
+        }
+
+        if (clipTimeIsValid) {
+            return "clip-local";
+        }
+
+        return "sequence";
+    }
+
+    function addDiagnostic(result, message) {
+        if (!result.diagnostics) {
+            result.diagnostics = [];
+        }
+
+        if (result.diagnostics.length < 300) {
+            result.diagnostics.push(String(message));
+        }
+    }
+
+    function describeTrackItemComponents(trackItem) {
+        var descriptions = [];
+        var components = collectionToArray(trackItem && trackItem.components);
+        var componentIndex;
+        var component;
+        var properties;
+        var propertyNames;
+        var propertyIndex;
+
+        for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
+            component = components[componentIndex];
+            properties = collectionToArray(component.properties);
+            propertyNames = [];
+
+            for (propertyIndex = 0; propertyIndex < properties.length && propertyIndex < 40; propertyIndex += 1) {
+                propertyNames.push(getPropertyName(properties[propertyIndex], "Parâmetro " + propertyIndex));
+            }
+
+            descriptions.push(
+                "componente["
+                + componentIndex
+                + "] matchName='"
+                + getComponentString(component, "matchName", "")
+                + "' displayName='"
+                + getComponentString(component, "displayName", "")
+                + "' parâmetros=["
+                + propertyNames.join(", ")
+                + "]"
+            );
+        }
+
+        return descriptions.join(" | ");
     }
 
     function getPropertyName(property, fallback) {
@@ -762,13 +825,17 @@
     }
 
     function enableKeyframes(property) {
+        var support;
+
         if (!property) {
             return false;
         }
 
         if (typeof property.areKeyframesSupported === "function") {
             try {
-                if (property.areKeyframesSupported() !== true) {
+                support = property.areKeyframesSupported();
+
+                if (support === false || support === 0 || String(support).toLowerCase() === "false") {
                     return false;
                 }
             } catch (supportError) {
@@ -1456,11 +1523,14 @@
             sampledKeys: 0,
             clipName: "",
             animation: null,
-            warnings: []
+            warnings: [],
+            diagnostics: []
         };
         var sequence;
         var selection;
         var trackItem;
+        var clipStartSeconds;
+        var clipDuration;
         var components;
         var componentIndex;
         var component;
@@ -1475,6 +1545,8 @@
         var offsetSeconds;
         var capturedKeyframes;
         var sampledKeyframes;
+        var propertyTimeBasis;
+        var sourceTimeBaseSeconds;
         var capturedProperties = [];
         var maxOffset = 0;
 
@@ -1500,7 +1572,14 @@
         }
 
         result.clipName = trackItem.name || "Clipe selecionado";
+        clipStartSeconds = timeToSeconds(getTrackItemStartTime(trackItem, sequence));
+        clipDuration = getTrackItemDurationSeconds(trackItem);
         components = collectionToArray(trackItem.components);
+        addDiagnostic(
+            result,
+            "Captura: clipe='" + result.clipName + "' início=" + clipStartSeconds + "s duração=" + clipDuration + "s."
+        );
+        addDiagnostic(result, "Componentes de origem: " + describeTrackItemComponents(trackItem));
 
         for (componentIndex = 0; componentIndex < components.length; componentIndex += 1) {
             component = components[componentIndex];
@@ -1518,13 +1597,14 @@
                         continue;
                     }
 
+                    propertyTimeBasis = detectPropertyTimeBasis(sortedKeys, clipStartSeconds, clipDuration);
+                    sourceTimeBaseSeconds = propertyTimeBasis === "sequence" ? clipStartSeconds : 0;
                     capturedKeyframes = [];
 
                     for (keyIndex = 0; keyIndex < sortedKeys.length; keyIndex += 1) {
                         keyTime = sortedKeys[keyIndex];
                         keySeconds = timeToSeconds(keyTime);
-                        // ComponentParam key times are relative to the beginning of the clip.
-                        offsetSeconds = keySeconds;
+                        offsetSeconds = Math.round((keySeconds - sourceTimeBaseSeconds) * 1000000) / 1000000;
 
                         if (!isFinite(offsetSeconds) || offsetSeconds < -0.05) {
                             continue;
@@ -1543,7 +1623,7 @@
                     }
 
                     if (capturedKeyframes.length > 0) {
-                        sampledKeyframes = samplePropertyCurve(property, capturedKeyframes);
+                        sampledKeyframes = samplePropertyCurve(property, capturedKeyframes, sourceTimeBaseSeconds);
                         result.sampledKeys += sampledKeyframes.length;
                         result.keys += sampledKeyframes.length;
                         capturedKeyframes = sortCapturedKeyframes(capturedKeyframes.concat(sampledKeyframes));
@@ -1555,12 +1635,27 @@
                             propertyDisplayName: getPropertyName(property, "Parâmetro"),
                             propertyIndex: propertyIndex,
                             semanticKey: getPropertySemanticKey(property),
+                            sourceTimeBasis: propertyTimeBasis,
                             sourceKeyframeCount: capturedKeyframes.length - sampledKeyframes.length,
                             sampledKeyframeCount: sampledKeyframes.length,
                             curveSampled: sampledKeyframes.length > 0,
                             keyframes: capturedKeyframes
                         });
                         result.properties += 1;
+                        addDiagnostic(
+                            result,
+                            "Capturado '"
+                            + getPropertyName(property, "Parâmetro")
+                            + "' como '"
+                            + getPropertySemanticKey(property)
+                            + "', base="
+                            + propertyTimeBasis
+                            + ", primeiro offset="
+                            + capturedKeyframes[0].offsetSeconds
+                            + "s, último offset="
+                            + capturedKeyframes[capturedKeyframes.length - 1].offsetSeconds
+                            + "s."
+                        );
                     }
                 } catch (propertyError) {
                     result.warnings.push(
@@ -1579,9 +1674,12 @@
         }
 
         result.animation = {
+            formatVersion: 2,
             sourceClipName: result.clipName,
+            sourceClipStartSeconds: clipStartSeconds,
+            sourceClipDurationSeconds: clipDuration,
             durationSeconds: maxOffset,
-            timeBasis: "clip",
+            timeBasis: "clip-offset",
             properties: capturedProperties
         };
         result.ok = true;
@@ -1658,13 +1756,16 @@
             keys: 0,
             presetName: payload && payload.presetName ? String(payload.presetName) : "Preset",
             animatedProperties: [],
-            warnings: []
+            warnings: [],
+            diagnostics: []
         };
         var animation = payload && payload.animation;
         var sequence;
         var selection;
         var clipIndex;
         var trackItem;
+        var targetStartSeconds;
+        var targetTimeBaseSeconds;
         var clipDuration;
         var propertyIndex;
         var capturedProperty;
@@ -1683,6 +1784,15 @@
             return result;
         }
 
+        if (Number(animation.formatVersion) !== 2 || animation.timeBasis !== "clip-offset") {
+            result.message = "Este preset foi registrado por uma versão anterior. Registre-o novamente antes de aplicar.";
+            addDiagnostic(
+                result,
+                "Preset incompatível: formatVersion=" + animation.formatVersion + ", timeBasis=" + animation.timeBasis + "."
+            );
+            return result;
+        }
+
         sequence = app.project && app.project.activeSequence;
 
         if (!sequence) {
@@ -1692,6 +1802,10 @@
 
         selection = collectionToArray(sequence.getSelection());
         result.clips = selection.length;
+        addDiagnostic(
+            result,
+            "Aplicação: preset='" + result.presetName + "', propriedades=" + animation.properties.length + ", clipes selecionados=" + selection.length + "."
+        );
 
         if (selection.length === 0) {
             result.message = "Selecione um clipe de texto ou gráfico para aplicar o preset.";
@@ -1700,7 +1814,19 @@
 
         for (clipIndex = 0; clipIndex < selection.length; clipIndex += 1) {
             trackItem = selection[clipIndex];
+            targetStartSeconds = timeToSeconds(getTrackItemStartTime(trackItem, sequence));
             clipDuration = getTrackItemDurationSeconds(trackItem);
+            addDiagnostic(
+                result,
+                "Destino: clipe='"
+                + (trackItem.name || "Clipe sem nome")
+                + "' início="
+                + targetStartSeconds
+                + "s duração="
+                + clipDuration
+                + "s."
+            );
+            addDiagnostic(result, "Componentes de destino: " + describeTrackItemComponents(trackItem));
 
             for (propertyIndex = 0; propertyIndex < animation.properties.length; propertyIndex += 1) {
                 capturedProperty = animation.properties[propertyIndex];
@@ -1714,13 +1840,35 @@
                         + (trackItem.name || "um clipe selecionado")
                         + "."
                     );
+                    addDiagnostic(
+                        result,
+                        "Falha de mapeamento: origem='"
+                        + capturedProperty.propertyDisplayName
+                        + "', semântica='"
+                        + (capturedProperty.semanticKey || "")
+                        + "', componente='"
+                        + (capturedProperty.componentDisplayName || "")
+                        + "'."
+                    );
                     continue;
                 }
 
+                addDiagnostic(
+                    result,
+                    "Mapeamento: origem='"
+                    + capturedProperty.propertyDisplayName
+                    + "' -> destino='"
+                    + getPropertyName(property, "Parâmetro")
+                    + "'."
+                );
+
                 if (!enableKeyframes(property)) {
                     result.warnings.push("O parâmetro " + capturedProperty.propertyDisplayName + " não aceita keyframes.");
+                    addDiagnostic(result, "Falha ao habilitar keyframes em '" + getPropertyName(property, "Parâmetro") + "'.");
                     continue;
                 }
+
+                targetTimeBaseSeconds = capturedProperty.sourceTimeBasis === "clip-local" ? 0 : targetStartSeconds;
 
                 for (keyIndex = 0; keyIndex < capturedProperty.keyframes.length; keyIndex += 1) {
                     capturedKey = capturedProperty.keyframes[keyIndex];
@@ -1731,11 +1879,57 @@
                             + capturedProperty.propertyDisplayName
                             + " foi ignorado porque ultrapassa a duração do clipe."
                         );
+                        addDiagnostic(
+                            result,
+                            "Keyframe ignorado: parâmetro='"
+                            + capturedProperty.propertyDisplayName
+                            + "', offset="
+                            + capturedKey.offsetSeconds
+                            + "s, duração do destino="
+                            + clipDuration
+                            + "s."
+                        );
                         continue;
                     }
 
-                    targetTime = createTimeFromSeconds(Math.max(0, numberValue(capturedKey.offsetSeconds, 0)));
-                    setAnimationKey(property, targetTime, capturedKey.value);
+                    targetTime = createTimeFromSeconds(
+                        targetTimeBaseSeconds + Math.max(0, numberValue(capturedKey.offsetSeconds, 0))
+                    );
+
+                    try {
+                        if (!setAnimationKey(property, targetTime, capturedKey.value)) {
+                            addDiagnostic(
+                                result,
+                                "setAnimationKey retornou false em '"
+                                + capturedProperty.propertyDisplayName
+                                + "' no tempo "
+                                + timeToSeconds(targetTime)
+                                + "s."
+                            );
+                            continue;
+                        }
+                    } catch (keyError) {
+                        result.warnings.push(
+                            "Falha ao aplicar "
+                            + capturedProperty.propertyDisplayName
+                            + " em "
+                            + capturedKey.offsetSeconds
+                            + "s: "
+                            + keyError
+                        );
+                        addDiagnostic(
+                            result,
+                            "Exceção em setValueAtKey: propriedade='"
+                            + capturedProperty.propertyDisplayName
+                            + "', tempo host="
+                            + timeToSeconds(targetTime)
+                            + "s, valor="
+                            + stringifyJson(capturedKey.value)
+                            + ", erro="
+                            + keyError
+                        );
+                        continue;
+                    }
 
                     if (capturedProperty.curveSampled) {
                         setInterpolationMode(property, targetTime, KF_INTERP_MODE_LINEAR);
@@ -1745,6 +1939,16 @@
 
                     result.applied += 1;
                     result.keys += 1;
+                    addDiagnostic(
+                        result,
+                        "Aplicado: propriedade='"
+                        + capturedProperty.propertyDisplayName
+                        + "', offset="
+                        + capturedKey.offsetSeconds
+                        + "s, tempo host="
+                        + timeToSeconds(targetTime)
+                        + "s."
+                    );
                 }
 
                 result.properties += 1;

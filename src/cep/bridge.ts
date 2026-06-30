@@ -1,3 +1,5 @@
+import { recordDiagnostic } from '../diagnostics/logger';
+
 type EvalScriptCallback = (result: string) => void;
 
 type EvalScriptHost = {
@@ -51,6 +53,7 @@ export type CapturedAnimationProperty = {
   propertyDisplayName: string;
   propertyIndex: number;
   semanticKey?: 'scale' | 'position' | 'opacity' | 'rotation' | 'anchor-point' | '';
+  sourceTimeBasis?: 'sequence' | 'clip-local';
   sourceKeyframeCount?: number;
   sampledKeyframeCount?: number;
   curveSampled?: boolean;
@@ -58,9 +61,12 @@ export type CapturedAnimationProperty = {
 };
 
 export type CapturedTextAnimation = {
+  formatVersion?: number;
   sourceClipName: string;
+  sourceClipStartSeconds?: number;
+  sourceClipDurationSeconds?: number;
   durationSeconds: number;
-  timeBasis?: 'clip';
+  timeBasis?: 'clip' | 'clip-offset';
   properties: CapturedAnimationProperty[];
 };
 
@@ -109,6 +115,7 @@ export type HostApplyResponse = {
   imported?: boolean;
   inserted?: boolean;
   warnings?: string[];
+  diagnostics?: string[];
 };
 
 export type RuntimeInfoResponse = HostApplyResponse & {
@@ -182,12 +189,16 @@ function toExtendScriptLiteral(value: unknown) {
 
 async function invokeHost<T>(functionName: string, payload?: unknown): Promise<T> {
   const argument = payload === undefined ? '' : toExtendScriptLiteral(payload);
-  const rawResponse = await evalHostScript(`${functionName}(${argument})`);
 
   try {
-    return JSON.parse(rawResponse) as T;
-  } catch {
-    throw new Error(`Resposta inválida de ${functionName}: ${rawResponse}`);
+    const rawResponse = await evalHostScript(`${functionName}(${argument})`);
+    const response = JSON.parse(rawResponse) as T;
+    recordDiagnostic({ functionName, payload, response });
+    return response;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    recordDiagnostic({ functionName, payload, error: message });
+    throw new Error(`Falha em ${functionName}: ${message}`);
   }
 }
 

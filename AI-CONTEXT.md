@@ -42,11 +42,13 @@ Fluxo atual:
 2. Seleciona o clipe animado na timeline.
 3. Digita um nome e usa `Registrar keyframes`.
 4. O host percorre os componentes e parâmetros animados do clipe.
-5. São capturados valores e tempos locais relativos ao início do clipe.
+5. O host detecta se os tempos retornados pelo `ComponentParam` estão na base da sequência ou do clipe e salva offsets relativos ao início do clipe.
 6. Propriedades conhecidas, como Escala, Posição e Opacidade, recebem uma identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
 7. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
 8. O preset é salvo em LocalStorage.
-9. Ao aplicar o preset, o host encontra o parâmetro equivalente no clipe de destino e recria os keyframes no mesmo tempo local.
+9. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
+
+O formato atual dos presets é a versão `2`, com `timeBasis: "clip-offset"`. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
 
 O formato TypeScript principal é `CapturedTextAnimationPreset`, definido em `src/cep/bridge.ts`.
 
@@ -70,6 +72,10 @@ O diretório inicial fica em `public/assets/sfx`, mas o usuário pode escolher q
 - `npm run build`: gera a extensão em `dist/`.
 - `npm run install:cep`: valida o Premiere 26.2.2 e instala a extensão.
 
+## Diagnóstico
+
+Todas as chamadas ao host geram registros com payload, resposta, avisos e decisões de mapeamento. O arquivo fica em `Thomados FunBox/logs/thomados-funbox-diagnostics.log`, dentro da pasta de dados do usuário retornada pelo CEP. O painel permite abrir o arquivo no Explorador ou copiar seu conteúdo.
+
 ## Próximos Passos
 
-Executar um smoke test no Premiere com um pop-in de Escala iniciado depois do começo do clipe e validar uma pasta de áudio que contenha múltiplos níveis de subpastas.
+Executar um smoke test no Premiere com um novo preset de pop-in de Escala e, em caso de falha, analisar o arquivo de diagnóstico gerado pelo painel.

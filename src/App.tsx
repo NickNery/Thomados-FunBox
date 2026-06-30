@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import AudioLibrary from './components/AudioLibrary';
 import BezierCurveEditor from './components/BezierCurveEditor';
+import DiagnosticsPanel from './components/DiagnosticsPanel';
 import TextAnimationGallery from './components/TextAnimationGallery';
 import {
   applyTemporalEaseToSelection,
@@ -18,6 +19,7 @@ import type {
   RuntimeInfoResponse,
   TemporalEasePayload
 } from './cep/bridge';
+import { recordDiagnostic } from './diagnostics/logger';
 
 type PingState = {
   loading: boolean;
@@ -74,9 +76,11 @@ export default function App() {
 
     try {
       const result = await evalHostScript('thomadosFunBox_ping()');
+      recordDiagnostic({ functionName: 'thomadosFunBox_ping', response: result });
       setPing({ loading: false, output: result, error: '' });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      recordDiagnostic({ functionName: 'thomadosFunBox_ping', error: message });
       setPing({ loading: false, output: '', error: message });
     }
   }
@@ -102,7 +106,7 @@ export default function App() {
       setApplyState({
         loading: false,
         output: formatted,
-        error: isOk ? '' : (response as { message?: string }).message || formatted,
+        error: isOk ? '' : formatted,
         mode: null
       });
     } catch (error) {
@@ -167,6 +171,8 @@ export default function App() {
             {applyState.error || applyState.output}
           </pre>
         )}
+
+        <DiagnosticsPanel />
 
         <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
           <div className="flex items-start justify-between gap-4">

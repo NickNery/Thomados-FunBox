@@ -39,7 +39,16 @@ Reinicie o Premiere e abra `Window > Extensions (Legacy) > Thomados FunBox`.
 - Editor de curvas: aplica interpolação Bézier e oferece geração de keyframes intermediários.
 - Biblioteca de animações: captura os keyframes reais do clipe selecionado, mantém o tempo relativo ao início do clipe e inclui efeitos nativos ou de terceiros ausentes no destino antes de aplicar suas propriedades.
 - Biblioteca de áudios: permite escolher uma pasta, navegar por subpastas, ouvir os arquivos e inseri-los no CTI da sequência.
+- Baixador de mídias: usa o Node.js do CEP e `yt-dlp` para baixar vídeo MP4 ou áudio MP3 na pasta do projeto atual.
 - Diagnóstico: registra chamadas JSX, mapeamento de parâmetros, tempos e erros em um arquivo que pode ser aberto ou copiado pelo painel.
+
+## Downloads
+
+O `yt-dlp.exe` é empacotado em `vendor/yt-dlp`. A pasta padrão vem de `app.project.path`; projetos ainda não salvos deixam o destino vazio até o usuário escolher uma pasta.
+
+Vídeos funcionam sem FFmpeg usando um formato progressivo. Para áudio MP3 e para mesclar vídeo/áudio na melhor qualidade, instale FFmpeg e deixe `ffmpeg.exe` disponível no `PATH`, ou distribua-o em `vendor/ffmpeg/bin/ffmpeg.exe`.
+
+Use o baixador apenas para mídias que você tem permissão para salvar.
 
 Nota: o Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` nem a leitura dos handles temporais na API pública CEP. Para preservar visualmente uma curva registrada, o painel captura amostras dos valores entre os keyframes e as recria como pontos lineares intermediários.
 

@@ -1,17 +1,18 @@
 {
   "name": "thomados-funbox",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "private": true,
   "description": "Adobe CEP panel for Premiere Pro built with React, TypeScript, Tailwind CSS, Vite, and ExtendScript.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "npm run typecheck && npm run validate:host && vite build && node scripts/copy-cep-assets.mjs",
+    "build": "npm run typecheck && npm run validate:host && npm run validate:downloader && vite build && node scripts/copy-cep-assets.mjs",
     "install:cep": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-cep.ps1",
     "preview": "vite preview --host 127.0.0.1",
     "test:host": "node scripts/test-host.mjs",
     "typecheck": "tsc --noEmit",
-    "validate:host": "node scripts/validate-host.mjs"
+    "validate:host": "node scripts/validate-host.mjs",
+    "validate:downloader": "node scripts/validate-downloader.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

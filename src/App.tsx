@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AudioLibrary from './components/AudioLibrary';
 import BezierCurveEditor from './components/BezierCurveEditor';
 import DiagnosticsPanel from './components/DiagnosticsPanel';
+import MediaDownloader from './components/MediaDownloader';
 import TextAnimationGallery from './components/TextAnimationGallery';
 import {
   applyTemporalEaseToSelection,
@@ -124,7 +125,7 @@ export default function App() {
           </p>
           <h1 className="mt-3 text-3xl font-bold">Thomados FunBox</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-300">
-            Curvas, animações e áudios para o Premiere Pro.
+            Curvas, animações, áudios e downloads para o Premiere Pro.
           </p>
         </header>
 
@@ -165,6 +166,8 @@ export default function App() {
           isInserting={applyState.loading && applyState.mode === 'audio'}
           onInsert={(absoluteFilePath) => runApply('audio', () => importAndInsertAudio(absoluteFilePath))}
         />
+
+        <MediaDownloader />
 
         {(applyState.output || applyState.error) && (
           <pre className="max-h-56 overflow-auto rounded-md border border-funbox-line bg-black/30 p-3 text-xs leading-5 text-zinc-200">

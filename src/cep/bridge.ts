@@ -219,6 +219,12 @@ export async function getRuntimeInfo(): Promise<RuntimeInfoResponse> {
   };
 }
 
+export async function getPremiereProjectDirectory(): Promise<string> {
+  const directory = await evalHostScript('thomadosFunBox_getProjectDirectory()');
+  recordDiagnostic({ functionName: 'thomadosFunBox_getProjectDirectory', response: directory });
+  return directory === 'undefined' || directory === 'null' ? '' : directory;
+}
+
 export async function applyTemporalEaseToSelection(payload: TemporalEasePayload): Promise<HostApplyResponse> {
   return invokeHost<HostApplyResponse>('thomadosFunBox_applyTemporalEase', payload);
 }

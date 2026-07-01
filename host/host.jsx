@@ -3180,6 +3180,33 @@
         };
     }
 
+    function getProjectDirectory() {
+        var projectPath;
+        var separatorIndex;
+
+        try {
+            projectPath = app.project && app.project.path ? String(app.project.path) : "";
+        } catch (error) {
+            return "";
+        }
+
+        if (!projectPath) {
+            return "";
+        }
+
+        separatorIndex = Math.max(projectPath.lastIndexOf("\\"), projectPath.lastIndexOf("/"));
+
+        if (separatorIndex < 0) {
+            return "";
+        }
+
+        if (separatorIndex === 2 && projectPath.charAt(1) === ":") {
+            return projectPath.substring(0, separatorIndex + 1);
+        }
+
+        return projectPath.substring(0, separatorIndex);
+    }
+
     function safeJsonCall(callback) {
         try {
             return stringifyJson(callback());
@@ -3199,6 +3226,10 @@
 
         getRuntimeInfo: function () {
             return safeJsonCall(getRuntimeInfo);
+        },
+
+        getProjectDirectory: function () {
+            return getProjectDirectory();
         },
 
         applyTemporalEase: function (payload) {
@@ -3242,6 +3273,10 @@
 
     $.global.thomadosFunBox_getRuntimeInfo = function () {
         return $.global.ThomadosFunBox.getRuntimeInfo();
+    };
+
+    $.global.thomadosFunBox_getProjectDirectory = function () {
+        return $.global.ThomadosFunBox.getProjectDirectory();
     };
 
     $.global.thomadosFunBox_applyTemporalEase = function (payload) {

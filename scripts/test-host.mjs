@@ -201,6 +201,7 @@ const sequence = {
 };
 const project = {
   name: 'Host Test',
+  path: 'C:\\Projects\\FunBox\\Edit.prproj',
   activeSequence: sequence,
   rootItem,
   importFiles: (paths) => {
@@ -281,6 +282,10 @@ const runtime = parse(api.thomadosFunBox_getRuntimeInfo());
 assert.equal(runtime.ok, true);
 assert.equal(runtime.compatible, true);
 assert.equal(runtime.appVersion, '26.2.2');
+assert.equal(api.thomadosFunBox_getProjectDirectory(), 'C:\\Projects\\FunBox');
+project.path = '';
+assert.equal(api.thomadosFunBox_getProjectDirectory(), '');
+project.path = 'C:\\Projects\\FunBox\\Edit.prproj';
 
 const ease = parse(api.thomadosFunBox_applyTemporalEase({
   ease: {

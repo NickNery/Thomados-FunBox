@@ -14,6 +14,7 @@ Stack tecnológica:
 - Tailwind CSS
 - Vite
 - ExtendScript (JSX)
+- React Bits (`DarkVeil`, `CardNav` e `BorderGlow`)
 
 ## Arquitetura
 
@@ -34,6 +35,20 @@ Fluxo:
 - Baixador de mídias com Node.js e yt-dlp: concluído.
 - Compatibilidade com Premiere Pro 26.2.2: concluída.
 - Instalador CEP para Windows: concluído.
+- Interface por abas com React Bits e paleta unificada: concluída.
+
+## Interface
+
+O `App.tsx` mantém `activeTab` e monta apenas a ferramenta selecionada. O `CardNav` organiza cinco telas em três grupos: Download, Animações e Biblioteca. O conteúdo ativo fica dentro de um único `BorderGlow`, evitando cartões aninhados e reduzindo o trabalho simultâneo do CEP.
+
+O `DarkVeil` usa `ogl` em um canvas fixo com `z-index: -1` e resolução reduzida para preservar desempenho no painel. O shader foi colorizado para interpolar exclusivamente entre a base `#2C2F33` e a secundária `#4A5466`.
+
+Paleta visual:
+- Base: `#2C2F33`
+- Secundária: `#4A5466`
+- Primária e glow: `#4371CC`
+
+Os componentes adaptados ficam em `src/react-bits/`. A licença está em `THIRD_PARTY_NOTICES/ReactBits-LICENSE.md`.
 
 ## Biblioteca de Animações
 

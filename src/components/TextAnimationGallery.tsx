@@ -161,7 +161,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
   }
 
   return (
-    <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
+    <section className="p-4">
       <div>
         <h2 className="text-base font-semibold">Biblioteca de animações</h2>
         <p className="mt-1 text-sm text-zinc-400">Presets capturados dos keyframes do clipe selecionado.</p>
@@ -180,14 +180,14 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
               }
             }}
             placeholder="Ex.: Entrada suave"
-            className="min-w-0 rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-zinc-100 outline-none focus:border-funbox-accent"
+            className="min-w-0 rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-white outline-none focus:border-funbox-accent"
           />
         </label>
         <button
           type="button"
           onClick={capturePreset}
           disabled={isCapturing || isApplying}
-          className="self-end rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+          className="self-end rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isCapturing ? 'Registrando...' : 'Registrar keyframes'}
         </button>
@@ -197,8 +197,8 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
         <p
           className={`mt-3 border-l-2 px-3 py-2 text-sm ${
             feedback.type === 'success'
-              ? 'border-emerald-500 bg-emerald-950/20 text-emerald-200'
-              : 'border-red-500 bg-red-950/20 text-red-200'
+              ? 'border-funbox-secondary bg-funbox-secondary/30 text-white'
+              : 'border-funbox-accent bg-funbox-secondary/30 text-white'
           }`}
         >
           {feedback.message}
@@ -224,7 +224,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
               </p>
               <p className="mt-1 truncate text-xs text-zinc-500">Origem: {preset.animation.sourceClipName}</p>
               {!isCompatible && (
-                <p className="mt-2 text-xs font-semibold text-amber-300">Registre novamente este preset.</p>
+                <p className="mt-2 text-xs font-semibold text-funbox-accent">Registre novamente este preset.</p>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
                 type="button"
                 onClick={() => onApply({ presetName: preset.name, animation: preset.animation })}
                 disabled={isApplying || isCapturing || !isCompatible}
-                className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+                className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isApplying ? 'Aplicando...' : 'Aplicar'}
               </button>
@@ -240,7 +240,7 @@ export default function TextAnimationGallery({ isApplying, onCapture, onApply }:
                 type="button"
                 onClick={() => removePreset(preset.id)}
                 disabled={isApplying || isCapturing}
-                className="rounded-md border border-funbox-line px-3 py-2 text-sm font-semibold text-zinc-300 transition hover:border-red-500 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-70"
+                className="rounded-md border border-funbox-line px-3 py-2 text-sm font-semibold text-white transition hover:border-funbox-accent hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-70"
               >
                 Excluir
               </button>

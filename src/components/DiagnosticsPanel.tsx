@@ -55,7 +55,7 @@ export default function DiagnosticsPanel() {
   }
 
   return (
-    <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
+    <section className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">Diagnóstico</h2>
@@ -77,7 +77,7 @@ export default function DiagnosticsPanel() {
             type="button"
             onClick={revealLog}
             disabled={!logPath}
-            className="flex h-9 items-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 items-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FolderOpen size={16} aria-hidden="true" />
             Abrir log

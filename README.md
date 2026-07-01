@@ -2,6 +2,8 @@
 
 Painel Adobe CEP para o Premiere Pro 26.2.2, criado com React, TypeScript, Tailwind CSS, Vite e ExtendScript.
 
+A interface usa os componentes React Bits `DarkVeil`, `CardNav` e `BorderGlow`, adaptados para navegação interna do painel. A atribuição e as condições de uso estão em `THIRD_PARTY_NOTICES/ReactBits-LICENSE.md`.
+
 ## Compatibilidade
 
 - Adobe Premiere Pro: `26.2.2`
@@ -41,6 +43,8 @@ Reinicie o Premiere e abra `Window > Extensions (Legacy) > Thomados FunBox`.
 - Biblioteca de áudios: permite escolher uma pasta, navegar por subpastas, ouvir os arquivos e inseri-los no CTI da sequência.
 - Baixador de mídias: usa o Node.js do CEP e `yt-dlp` para baixar vídeo MP4 ou áudio MP3 na pasta do projeto atual.
 - Diagnóstico: registra chamadas JSX, mapeamento de parâmetros, tempos e erros em um arquivo que pode ser aberto ou copiado pelo painel.
+
+As ferramentas são abertas por abas no menu principal. A paleta visual usa `#2C2F33` como base, `#4A5466` em bordas e transições e `#4371CC` em ações e emissão luminosa.
 
 ## Downloads
 

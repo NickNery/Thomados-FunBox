@@ -241,7 +241,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
   const isBusy = isApplying || isBaking;
 
   return (
-    <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
+    <section className="p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-base font-semibold">Editor de curvas</h2>
@@ -260,7 +260,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
             type="button"
             onClick={bakeCurve}
             disabled={isBusy}
-            className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+            className="rounded-md bg-funbox-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isBaking ? 'Gerando...' : 'Gerar keyframes'}
           </button>
@@ -272,29 +272,29 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
         aria-label="Editor visual de curva Bézier"
-        className="mt-4 aspect-[18/13] w-full select-none rounded-md border border-funbox-line bg-[#0c0d10]"
+        className="mt-4 aspect-[18/13] w-full select-none rounded-md border border-funbox-line bg-funbox-background"
         onPointerMove={handlePointerMove}
         onPointerUp={() => setActiveHandle(null)}
         onPointerLeave={() => setActiveHandle(null)}
       >
         <defs>
           <pattern id="curve-grid" width="36" height="32" patternUnits="userSpaceOnUse">
-            <path d="M 36 0 L 0 0 0 32" fill="none" stroke="#252932" strokeWidth="1" />
+            <path d="M 36 0 L 0 0 0 32" fill="none" stroke="#4A5466" strokeWidth="1" />
           </pattern>
         </defs>
         <rect x={PAD} y={PAD} width={GRAPH_WIDTH} height={GRAPH_HEIGHT} fill="url(#curve-grid)" />
-        <line x1={PAD} y1={PAD + GRAPH_HEIGHT} x2={PAD + GRAPH_WIDTH} y2={PAD + GRAPH_HEIGHT} stroke="#606775" />
-        <line x1={PAD} y1={PAD} x2={PAD} y2={PAD + GRAPH_HEIGHT} stroke="#606775" />
-        <line x1={startSvg.x} y1={startSvg.y} x2={outgoingSvg.x} y2={outgoingSvg.y} stroke="#f59e0b" strokeDasharray="4 4" />
-        <line x1={endSvg.x} y1={endSvg.y} x2={incomingSvg.x} y2={incomingSvg.y} stroke="#38bdf8" strokeDasharray="4 4" />
+        <line x1={PAD} y1={PAD + GRAPH_HEIGHT} x2={PAD + GRAPH_WIDTH} y2={PAD + GRAPH_HEIGHT} stroke="#4A5466" />
+        <line x1={PAD} y1={PAD} x2={PAD} y2={PAD + GRAPH_HEIGHT} stroke="#4A5466" />
+        <line x1={startSvg.x} y1={startSvg.y} x2={outgoingSvg.x} y2={outgoingSvg.y} stroke="#4371CC" strokeDasharray="4 4" />
+        <line x1={endSvg.x} y1={endSvg.y} x2={incomingSvg.x} y2={incomingSvg.y} stroke="#4A5466" strokeDasharray="4 4" />
         <path d={createPath(outgoing, incoming)} fill="none" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" />
-        <circle cx={startSvg.x} cy={startSvg.y} r="4" fill="#a1a1aa" />
-        <circle cx={endSvg.x} cy={endSvg.y} r="4" fill="#a1a1aa" />
+        <circle cx={startSvg.x} cy={startSvg.y} r="4" fill="#4A5466" />
+        <circle cx={endSvg.x} cy={endSvg.y} r="4" fill="#4A5466" />
         <circle
           cx={outgoingSvg.x}
           cy={outgoingSvg.y}
           r="9"
-          fill="#f59e0b"
+          fill="#4371CC"
           className="cursor-grab active:cursor-grabbing"
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -305,35 +305,35 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
           cx={incomingSvg.x}
           cy={incomingSvg.y}
           r="9"
-          fill="#38bdf8"
+          fill="#4A5466"
           className="cursor-grab active:cursor-grabbing"
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId);
             setActiveHandle('incoming');
           }}
         />
-        <text x={PAD} y={HEIGHT - 9} fill="#9ca3af" fontSize="10">
+        <text x={PAD} y={HEIGHT - 9} fill="#FFFFFF" fontSize="10">
           Saída
         </text>
-        <text x={WIDTH - PAD - 38} y={PAD - 12} fill="#9ca3af" fontSize="10">
+        <text x={WIDTH - PAD - 38} y={PAD - 12} fill="#FFFFFF" fontSize="10">
           Entrada
         </text>
       </svg>
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-md border border-funbox-line bg-black/20 p-3">
-          <p className="font-semibold text-amber-300">Saída</p>
+        <div className="rounded-md border border-funbox-line bg-funbox-secondary/20 p-3">
+          <p className="font-semibold text-funbox-accent">Saída</p>
           <p className="mt-1 text-zinc-300">Velocidade {ease.outgoing.speed}</p>
           <p className="text-zinc-300">Influência {ease.outgoing.influence}%</p>
         </div>
-        <div className="rounded-md border border-funbox-line bg-black/20 p-3">
+        <div className="rounded-md border border-funbox-line bg-funbox-secondary/20 p-3">
           <p className="font-semibold text-sky-300">Entrada</p>
           <p className="mt-1 text-zinc-300">Velocidade {ease.incoming.speed}</p>
           <p className="text-zinc-300">Influência {ease.incoming.influence}%</p>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 rounded-md border border-funbox-line bg-black/20 p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="mt-4 grid gap-3 rounded-md border border-funbox-line bg-funbox-secondary/20 p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
         <label className="grid gap-1 text-zinc-300">
           <span className="font-semibold text-zinc-100">Amostras da curva</span>
           <input
@@ -342,7 +342,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
             max={32}
             value={bakeSamples}
             onChange={(event) => setBakeSamples(clamp(Number(event.target.value) || 1, 1, 32))}
-            className="w-full rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-funbox-accent sm:w-28"
+            className="w-full rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-sm text-white outline-none focus:border-funbox-accent sm:w-28"
           />
         </label>
         <label className="flex items-center gap-2 text-zinc-300">
@@ -361,7 +361,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
           <select
             value={selectedPresetId}
             onChange={(event) => loadPreset(event.target.value)}
-            className="min-w-0 rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-funbox-accent"
+            className="min-w-0 rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-sm text-white outline-none focus:border-funbox-accent"
           >
             {presets.map((preset) => (
               <option key={preset.id} value={preset.id}>
@@ -381,7 +381,7 @@ export default function BezierCurveEditor({ isApplying, isBaking, onApply, onBak
           <input
             value={presetName}
             onChange={(event) => setPresetName(event.target.value)}
-            className="min-w-0 rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-funbox-accent"
+            className="min-w-0 rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-sm text-white outline-none focus:border-funbox-accent"
           />
           <button
             type="button"

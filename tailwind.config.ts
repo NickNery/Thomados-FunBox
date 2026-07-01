@@ -6,10 +6,11 @@ export default {
     extend: {
       colors: {
         funbox: {
-          background: '#101114',
-          panel: '#191b20',
-          accent: '#f59e0b',
-          line: '#30343d'
+          background: '#2C2F33',
+          panel: '#2C2F33',
+          secondary: '#4A5466',
+          accent: '#4371CC',
+          line: '#4A5466'
         }
       }
     }

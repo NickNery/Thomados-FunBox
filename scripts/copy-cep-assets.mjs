@@ -8,7 +8,7 @@ const dist = resolve(root, 'dist');
 
 await mkdir(dist, { recursive: true });
 
-for (const directory of ['CSXS', 'host', 'vendor']) {
+for (const directory of ['CSXS', 'host', 'vendor', 'THIRD_PARTY_NOTICES']) {
   const source = resolve(root, directory);
   const target = resolve(dist, directory);
 

@@ -300,7 +300,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
   }
 
   return (
-    <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
+    <section className="p-4">
       <audio ref={audioRef} onEnded={() => setActivePath('')} />
 
       <div className="flex items-start justify-between gap-3">
@@ -324,7 +324,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
           <button
             type="button"
             onClick={selectDirectory}
-            className="flex h-9 items-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+            className="flex h-9 items-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-white transition hover:bg-funbox-secondary"
           >
             <FolderOpen size={16} aria-hidden="true" />
             Escolher pasta
@@ -409,7 +409,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
                 disabled={isInserting}
                 title="Adicionar à timeline"
                 aria-label={`Adicionar ${asset.name} à timeline`}
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-funbox-accent text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-funbox-accent text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <Plus size={17} aria-hidden="true" />
               </button>
@@ -423,7 +423,7 @@ export default function AudioLibrary({ isInserting, onInsert }: AudioLibraryProp
       </div>
 
       {error && (
-        <div className="mt-3 border-l-2 border-red-500 bg-red-950/20 px-3 py-2 text-sm text-red-200">{error}</div>
+        <div className="mt-3 border-l-2 border-funbox-accent bg-funbox-secondary/30 px-3 py-2 text-sm text-white">{error}</div>
       )}
     </section>
   );

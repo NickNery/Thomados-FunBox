@@ -154,7 +154,7 @@ export default function MediaDownloader() {
   }
 
   return (
-    <section className="rounded-lg border border-funbox-line bg-funbox-panel p-4 shadow-xl shadow-black/20">
+    <section className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Baixador de mídias</h2>
@@ -180,7 +180,7 @@ export default function MediaDownloader() {
           disabled={isDownloading}
           rows={3}
           placeholder="https://..."
-          className="min-w-0 resize-none rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-zinc-100 outline-none focus:border-funbox-accent disabled:opacity-60"
+          className="min-w-0 resize-none rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-white outline-none focus:border-funbox-accent disabled:opacity-60"
         />
       </label>
 
@@ -193,7 +193,7 @@ export default function MediaDownloader() {
             disabled={isDownloading}
             aria-pressed={format === 'video'}
             className={`flex h-10 items-center justify-center gap-2 text-sm font-semibold transition ${
-              format === 'video' ? 'bg-funbox-accent text-zinc-950' : 'bg-[#111318] text-zinc-300 hover:text-zinc-100'
+              format === 'video' ? 'bg-funbox-accent text-white' : 'bg-funbox-background text-white hover:bg-funbox-secondary'
             }`}
           >
             <Video size={16} aria-hidden="true" />
@@ -205,7 +205,7 @@ export default function MediaDownloader() {
             disabled={isDownloading}
             aria-pressed={format === 'audio'}
             className={`flex h-10 items-center justify-center gap-2 border-l border-funbox-line text-sm font-semibold transition ${
-              format === 'audio' ? 'bg-funbox-accent text-zinc-950' : 'bg-[#111318] text-zinc-300 hover:text-zinc-100'
+              format === 'audio' ? 'bg-funbox-accent text-white' : 'bg-funbox-background text-white hover:bg-funbox-secondary'
             }`}
           >
             <Music size={16} aria-hidden="true" />
@@ -222,7 +222,7 @@ export default function MediaDownloader() {
             onChange={(event) => setDestination(event.target.value)}
             disabled={isDownloading}
             title={destination}
-            className="min-w-0 rounded-md border border-funbox-line bg-[#111318] px-3 py-2 text-zinc-100 outline-none focus:border-funbox-accent disabled:opacity-60"
+            className="min-w-0 rounded-md border border-funbox-line bg-funbox-background px-3 py-2 text-white outline-none focus:border-funbox-accent disabled:opacity-60"
           />
           <button
             type="button"
@@ -242,7 +242,7 @@ export default function MediaDownloader() {
           type="button"
           onClick={beginDownload}
           disabled={isDownloading || !url.trim() || !destination.trim()}
-          className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-md bg-funbox-accent px-3 text-sm font-semibold text-white transition hover:bg-funbox-secondary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Download size={17} aria-hidden="true" />
           {isDownloading ? 'Baixando...' : 'Baixar'}
@@ -251,7 +251,7 @@ export default function MediaDownloader() {
           <button
             type="button"
             onClick={cancelDownload}
-            className="flex h-10 items-center justify-center gap-2 rounded-md border border-red-500 px-3 text-sm font-semibold text-red-200 transition hover:bg-red-950/30"
+            className="flex h-10 items-center justify-center gap-2 rounded-md border border-funbox-accent px-3 text-sm font-semibold text-white transition hover:bg-funbox-secondary"
           >
             <Square size={14} fill="currentColor" aria-hidden="true" />
             Cancelar
@@ -260,7 +260,7 @@ export default function MediaDownloader() {
       </div>
 
       <div className="mt-3" aria-live="polite">
-        <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+        <div className="h-1.5 overflow-hidden rounded-full bg-funbox-secondary">
           <div
             className="h-full bg-funbox-accent transition-[width] duration-200"
             style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
@@ -276,7 +276,7 @@ export default function MediaDownloader() {
       )}
 
       {error && (
-        <div className="mt-3 break-words border-l-2 border-red-500 bg-red-950/20 px-3 py-2 text-sm text-red-200">
+        <div className="mt-3 break-words border-l-2 border-funbox-accent bg-funbox-secondary/30 px-3 py-2 text-sm text-white">
           {error}
         </div>
       )}

@@ -1,6 +1,6 @@
 {
   "name": "thomados-funbox",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Adobe CEP panel for Premiere Pro built with React, TypeScript, Tailwind CSS, Vite, and ExtendScript.",
   "type": "module",

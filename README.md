@@ -43,6 +43,6 @@ Reinicie o Premiere e abra `Window > Extensions (Legacy) > Thomados FunBox`.
 
 Nota: o Premiere Pro 26.2.2 não expõe `setTemporalEaseAtKey()` nem a leitura dos handles temporais na API pública CEP. Para preservar visualmente uma curva registrada, o painel captura amostras dos valores entre os keyframes e as recria como pontos lineares intermediários.
 
-No CEP, a coleção pública de componentes não oferece uma inclusão documentada de efeitos. Para o Premiere Pro 26.2.2, o painel tenta métodos disponíveis em runtime e usa o QE DOM como fallback, sempre verificando o `matchName` após a inclusão. Plugins de terceiros precisam estar instalados no computador de destino.
+No CEP, a coleção pública de componentes não oferece uma inclusão documentada de efeitos. Para o Premiere Pro 26.2.2, o painel usa o QE DOM com o nome localizado da interface para criar o efeito. Em seguida, recupera novamente o clipe e sua coleção `components` no DOM padrão antes de aplicar os keyframes. Plugins de terceiros precisam estar instalados no computador de destino.
 
 Presets registrados antes da versão `1.6.0` devem ser criados novamente para armazenar a identidade dos efeitos e a base temporal detectada.

@@ -46,10 +46,11 @@ Fluxo atual:
 5. O host lê tempos prioritariamente por `.ticks`, avalia `TrackItem.inPoint`, `Sequence.zeroPoint + TrackItem.start` e zero local, e escolhe a base que mantém os keyframes dentro da duração do clipe.
 6. Componentes intrínsecos e efeitos de vídeo são separados. Propriedades intrínsecas conhecidas recebem identidade semântica para funcionar entre Movimento de vídeo e Movimento Vetorial de gráficos.
 7. Efeitos nativos e de terceiros são registrados por `matchName`, `displayName` e ocorrência. Se estiverem ausentes no destino, o host tenta adicioná-los e confirma sua presença antes de mapear os parâmetros.
-8. No CEP, a inclusão usa métodos públicos detectados em runtime quando disponíveis e o QE DOM como fallback específico do Premiere Pro 26.2.2.
-9. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
-10. O preset é salvo em LocalStorage.
-11. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
+8. No CEP, a inclusão é feita pelo QE DOM: o clipe é localizado por trilha/índice, o efeito é resolvido exclusivamente pelo `componentDisplayName` localizado e aplicado com `qeTrackItem.addVideoEffect()`.
+9. Depois da inclusão, o host descarta a coleção antiga, recupera novamente o `TrackItem` no DOM padrão e relê `trackItem.components` antes de mapear propriedades e keyframes.
+10. Como a API CEP não expõe os handles temporais, curvas numéricas são amostradas entre os keyframes e reaplicadas com pontos lineares intermediários.
+11. O preset é salvo em LocalStorage.
+12. Ao aplicar o preset, o host encontra o parâmetro equivalente e converte cada offset para a base temporal esperada pelo clipe de destino.
 
 O formato atual dos presets é a versão `5`, com `timeBasis: "clip-offset"`. Ele armazena zero point, start, inPoint, a base temporal detectada e a identidade dos efeitos. Presets anteriores devem ser registrados novamente e ficam desabilitados na interface.
 

@@ -145,16 +145,29 @@ const targetScale = makeParam('Escala', 100, []);
 targetScale.areKeyframesSupported = () => 1;
 const targetEffectScale = makeParam('Escala', 0, []);
 targetEffectScale.areKeyframesSupported = () => 1;
+const initialTargetComponents = collection([
+  { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([targetScale]) }
+]);
+let targetComponents = initialTargetComponents;
 const targetClip = {
   name: 'Video Clip',
   start: new MockTime(5.875),
   inPoint: new MockTime(4200),
   end: new MockTime(10.875),
   duration: new MockTime(5),
-  components: collection([
-    { matchName: 'AE.ADBE Motion', displayName: 'Movimento', properties: collection([targetScale]) }
-  ])
+  components: initialTargetComponents
 };
+const refreshedTargetClip = {
+  name: targetClip.name,
+  start: targetClip.start,
+  inPoint: targetClip.inPoint,
+  end: targetClip.end,
+  duration: targetClip.duration
+};
+Object.defineProperty(refreshedTargetClip, 'components', {
+  enumerable: true,
+  get: () => targetComponents
+});
 const curveScale = makeParam('Escala', 100, [new MockTime(1), new MockTime(2)]);
 const curveClip = {
   name: 'Curve Test Clip',
@@ -180,6 +193,7 @@ const rootItem = { name: 'Root', children: collection([]) };
 const sequence = {
   name: 'Sequence 01',
   zeroPoint: '0',
+  videoTracks: collection([{ clips: collection([refreshedTargetClip]) }]),
   audioTracks: collection([audioTrack]),
   getSelection: () => collection(selectedItems.slice()),
   getPlayerPosition: () => new MockTime(3),
@@ -209,11 +223,14 @@ const qeTargetClip = {
   end: targetClip.end,
   addVideoEffect: (effect) => {
     assert.equal(effect, qeEffectDescriptor);
-    targetClip.components.push({
-      matchName: effect.matchName,
-      displayName: effect.displayName,
-      properties: collection([targetEffectScale])
-    });
+    targetComponents = collection([
+      ...targetComponents,
+      {
+        matchName: effect.matchName,
+        displayName: effect.displayName,
+        properties: collection([targetEffectScale])
+      }
+    ]);
     return true;
   }
 };
@@ -225,12 +242,13 @@ const qeSequence = {
   numVideoTracks: 1,
   getVideoTrackAt: (index) => (index === 0 ? qeVideoTrack : null)
 };
+const qeEffectLookups = [];
 const qeProject = {
   getActiveSequence: () => qeSequence,
-  getVideoEffectByName: (name) =>
-    name === qeEffectDescriptor.matchName || name === qeEffectDescriptor.displayName
-      ? qeEffectDescriptor
-      : null
+  getVideoEffectByName: (name) => {
+    qeEffectLookups.push(name);
+    return name === qeEffectDescriptor.displayName ? qeEffectDescriptor : null;
+  }
 };
 
 function MockFile(path) {
@@ -328,8 +346,11 @@ assert.ok(
 assert.equal(targetEffectScale._values.length, 10);
 assert.equal(targetEffectScale._values[0].value, 25);
 assert.equal(targetEffectScale._values.at(-1).value, 75);
-assert.equal(targetClip.components.at(-1).matchName, 'Vendor.Super Scale');
-assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes('QE TrackItem.addVideoEffect()')));
+assert.equal(targetClip.components.length, 1);
+assert.equal(refreshedTargetClip.components.at(-1).matchName, 'Vendor.Super Scale');
+assert.deepEqual(qeEffectLookups, ['Super Escala']);
+assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes('components relido após QE')));
+assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes('qeTrackItem.addVideoEffect() executado')));
 assert.ok(appliedAnimation.diagnostics.some((entry) => entry.includes("Mapeamento: origem='Escala'")));
 
 const legacyAnimation = parse(api.thomadosFunBox_applyCapturedTextAnimation({

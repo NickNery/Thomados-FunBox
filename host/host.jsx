@@ -1856,8 +1856,7 @@
         return result;
     }
 
-    function findCapturedComponent(trackItem, capturedProperty) {
-        var components = collectionToArray(trackItem.components);
+    function findCapturedComponentInComponents(components, capturedProperty) {
         var targetMatchName = normalizeIdentifier(capturedProperty.componentMatchName);
         var targetDisplayName = normalizeIdentifier(capturedProperty.componentDisplayName);
         var targetOrdinal = Math.max(0, numberValue(capturedProperty.componentMatchOrdinal, 0));
@@ -1892,11 +1891,32 @@
         return getCollectionItem(components, Number(capturedProperty.componentIndex));
     }
 
+    function findCapturedComponent(trackItem, capturedProperty) {
+        var updatedComponents;
+
+        try {
+            updatedComponents = trackItem.components;
+        } catch (error) {
+            return null;
+        }
+
+        return findCapturedComponentInComponents(collectionToArray(updatedComponents), capturedProperty);
+    }
+
     function countCapturedComponents(trackItem, capturedProperty) {
-        var components = collectionToArray(trackItem.components);
+        var updatedComponents;
+        var components;
         var targetMatchName = normalizeIdentifier(capturedProperty.componentMatchName);
         var count = 0;
         var index;
+
+        try {
+            updatedComponents = trackItem.components;
+        } catch (error) {
+            return 0;
+        }
+
+        components = collectionToArray(updatedComponents);
 
         for (index = 0; index < components.length; index += 1) {
             if (
@@ -1981,7 +2001,156 @@
         }
     }
 
-    function findQeTrackItem(sequence, trackItem, result) {
+    function findStandardTrackItemLocation(sequence, trackItem, result) {
+        var tracks = collectionToArray(sequence && sequence.videoTracks);
+        var targetNodeId = getObjectIdentifier(trackItem, "nodeId");
+        var targetName = normalizeIdentifier(getObjectIdentifier(trackItem, "name"));
+        var targetStart = getTrackItemTimeSeconds(trackItem, "start");
+        var targetEnd = getTrackItemTimeSeconds(trackItem, "end");
+        var targetDuration = getTrackItemDurationSeconds(trackItem);
+        var bestLocation = null;
+        var bestScore = -1;
+        var trackIndex;
+        var clips;
+        var clipIndex;
+        var candidate;
+        var candidateNodeId;
+        var score;
+
+        for (trackIndex = 0; trackIndex < tracks.length; trackIndex += 1) {
+            clips = collectionToArray(tracks[trackIndex] && tracks[trackIndex].clips);
+
+            for (clipIndex = 0; clipIndex < clips.length; clipIndex += 1) {
+                candidate = clips[clipIndex];
+                candidateNodeId = getObjectIdentifier(candidate, "nodeId");
+                score = 0;
+
+                if (candidate === trackItem) {
+                    score += 200;
+                }
+
+                if (targetNodeId && candidateNodeId && targetNodeId === candidateNodeId) {
+                    score += 100;
+                }
+
+                if (targetName && normalizeIdentifier(getObjectIdentifier(candidate, "name")) === targetName) {
+                    score += 4;
+                }
+
+                if (Math.abs(getTrackItemTimeSeconds(candidate, "start") - targetStart) < 0.002) {
+                    score += 8;
+                }
+
+                if (Math.abs(getTrackItemTimeSeconds(candidate, "end") - targetEnd) < 0.002) {
+                    score += 4;
+                }
+
+                if (Math.abs(getTrackItemDurationSeconds(candidate) - targetDuration) < 0.002) {
+                    score += 3;
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestLocation = {
+                        trackIndex: trackIndex,
+                        clipIndex: clipIndex
+                    };
+                }
+            }
+        }
+
+        if (bestScore < 15) {
+            addDiagnostic(result, "DOM padrão: posição do clipe não identificada com segurança (pontuação=" + bestScore + ").");
+            return null;
+        }
+
+        addDiagnostic(
+            result,
+            "DOM padrão: clipe localizado em videoTrack["
+            + bestLocation.trackIndex
+            + "].clips["
+            + bestLocation.clipIndex
+            + "] (pontuação="
+            + bestScore
+            + ")."
+        );
+        return bestLocation;
+    }
+
+    function getStandardTrackItemAt(sequence, location, fallbackTrackItem) {
+        var activeSequence = sequence;
+        var tracks;
+        var track;
+        var clips;
+
+        try {
+            if (app.project && app.project.activeSequence) {
+                activeSequence = app.project.activeSequence;
+            }
+        } catch (error) {
+            activeSequence = sequence;
+        }
+
+        if (!location) {
+            return fallbackTrackItem;
+        }
+
+        tracks = collectionToArray(activeSequence && activeSequence.videoTracks);
+        track = getCollectionItem(tracks, location.trackIndex);
+        clips = collectionToArray(track && track.clips);
+        return getCollectionItem(clips, location.clipIndex) || fallbackTrackItem;
+    }
+
+    function scoreQeTrackItemMatch(sequence, trackItem, qeItem) {
+        var targetNodeId = getObjectIdentifier(trackItem, "nodeId");
+        var targetName = normalizeIdentifier(getObjectIdentifier(trackItem, "name"));
+        var targetStart = getTrackItemTimeSeconds(trackItem, "start");
+        var targetEnd = getTrackItemTimeSeconds(trackItem, "end");
+        var targetDuration = getTrackItemDurationSeconds(trackItem);
+        var sequenceZeroPoint = getSequenceZeroPointSeconds(sequence);
+        var qeNodeId = getObjectIdentifier(qeItem, "nodeId");
+        var qeName = normalizeIdentifier(getObjectIdentifier(qeItem, "name"));
+        var qeStart = getTrackItemTimeSeconds(qeItem, "start");
+        var qeEnd = getTrackItemTimeSeconds(qeItem, "end");
+        var qeDuration = isFinite(qeStart) && isFinite(qeEnd) ? qeEnd - qeStart : NaN;
+        var score = 0;
+
+        if (targetNodeId && qeNodeId && targetNodeId === qeNodeId) {
+            score += 100;
+        }
+
+        if (targetName && qeName === targetName) {
+            score += 4;
+        }
+
+        if (
+            isFinite(qeStart)
+            && (
+                Math.abs(qeStart - targetStart) < 0.002
+                || Math.abs(qeStart - (sequenceZeroPoint + targetStart)) < 0.002
+            )
+        ) {
+            score += 8;
+        }
+
+        if (
+            isFinite(qeEnd)
+            && (
+                Math.abs(qeEnd - targetEnd) < 0.002
+                || Math.abs(qeEnd - (sequenceZeroPoint + targetEnd)) < 0.002
+            )
+        ) {
+            score += 4;
+        }
+
+        if (isFinite(qeDuration) && Math.abs(qeDuration - targetDuration) < 0.002) {
+            score += 3;
+        }
+
+        return score;
+    }
+
+    function findQeTrackItem(sequence, trackItem, standardLocation, result) {
         var qeSequence;
         var trackCount;
         var trackIndex;
@@ -1989,17 +2158,7 @@
         var itemCount;
         var itemIndex;
         var qeItem;
-        var targetNodeId = getObjectIdentifier(trackItem, "nodeId");
         var targetName = normalizeIdentifier(getObjectIdentifier(trackItem, "name"));
-        var targetStart = getTrackItemTimeSeconds(trackItem, "start");
-        var targetEnd = getTrackItemTimeSeconds(trackItem, "end");
-        var targetDuration = getTrackItemDurationSeconds(trackItem);
-        var sequenceZeroPoint = getSequenceZeroPointSeconds(sequence);
-        var qeStart;
-        var qeEnd;
-        var qeDuration;
-        var qeNodeId;
-        var qeName;
         var score;
         var bestScore = -1;
         var bestItem = null;
@@ -2028,6 +2187,31 @@
             return null;
         }
 
+        if (standardLocation) {
+            qeTrack = getQeItemAt(qeSequence, "getVideoTrackAt", standardLocation.trackIndex);
+            qeItem = getQeItemAt(qeTrack, "getItemAt", standardLocation.clipIndex);
+            score = scoreQeTrackItemMatch(sequence, trackItem, qeItem);
+
+            if (qeItem && typeof qeItem.addVideoEffect === "function" && score >= 11) {
+                addDiagnostic(
+                    result,
+                    "QE: clipe acessado diretamente em videoTrack["
+                    + standardLocation.trackIndex
+                    + "].item["
+                    + standardLocation.clipIndex
+                    + "] (pontuação="
+                    + score
+                    + ")."
+                );
+                return qeItem;
+            }
+
+            addDiagnostic(
+                result,
+                "QE: o acesso direto pelos índices não correspondeu ao clipe selecionado (pontuação=" + score + ")."
+            );
+        }
+
         trackCount = getQeNumericProperty(qeSequence, "numVideoTracks");
 
         for (trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
@@ -2041,44 +2225,7 @@
                     continue;
                 }
 
-                qeNodeId = getObjectIdentifier(qeItem, "nodeId");
-                qeName = normalizeIdentifier(getObjectIdentifier(qeItem, "name"));
-                qeStart = getTrackItemTimeSeconds(qeItem, "start");
-                qeEnd = getTrackItemTimeSeconds(qeItem, "end");
-                qeDuration = isFinite(qeStart) && isFinite(qeEnd) ? qeEnd - qeStart : NaN;
-                score = 0;
-
-                if (targetNodeId && qeNodeId && targetNodeId === qeNodeId) {
-                    score += 100;
-                }
-
-                if (targetName && qeName === targetName) {
-                    score += 4;
-                }
-
-                if (
-                    isFinite(qeStart)
-                    && (
-                        Math.abs(qeStart - targetStart) < 0.002
-                        || Math.abs(qeStart - (sequenceZeroPoint + targetStart)) < 0.002
-                    )
-                ) {
-                    score += 8;
-                }
-
-                if (
-                    isFinite(qeEnd)
-                    && (
-                        Math.abs(qeEnd - targetEnd) < 0.002
-                        || Math.abs(qeEnd - (sequenceZeroPoint + targetEnd)) < 0.002
-                    )
-                ) {
-                    score += 4;
-                }
-
-                if (isFinite(qeDuration) && Math.abs(qeDuration - targetDuration) < 0.002) {
-                    score += 3;
-                }
+                score = scoreQeTrackItemMatch(sequence, trackItem, qeItem);
 
                 if (score > bestScore) {
                     bestScore = score;
@@ -2100,9 +2247,7 @@
     }
 
     function findQeVideoEffectDescriptor(capturedProperty, result) {
-        var candidates = [capturedProperty.componentMatchName, capturedProperty.componentDisplayName];
-        var candidateIndex;
-        var candidate;
+        var displayName = String(capturedProperty.componentDisplayName || "");
         var descriptor;
 
         try {
@@ -2117,63 +2262,133 @@
             return null;
         }
 
-        for (candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
-            candidate = String(candidates[candidateIndex] || "");
-
-            if (!candidate) {
-                continue;
-            }
-
-            try {
-                descriptor = qe.project.getVideoEffectByName(candidate);
-
-                if (descriptor) {
-                    addDiagnostic(result, "QE: efeito resolvido por '" + candidate + "'.");
-                    return descriptor;
-                }
-            } catch (lookupError) {
-                addDiagnostic(result, "QE: busca do efeito por '" + candidate + "' falhou: " + lookupError);
-            }
+        if (!displayName) {
+            addDiagnostic(result, "QE: o preset não contém componentDisplayName para localizar o efeito.");
+            return null;
         }
 
-        addDiagnostic(
-            result,
-            "QE: efeito não encontrado por matchName='"
-            + (capturedProperty.componentMatchName || "")
-            + "' ou displayName='"
-            + (capturedProperty.componentDisplayName || "")
-            + "'."
-        );
+        try {
+            descriptor = qe.project.getVideoEffectByName(displayName);
+
+            if (descriptor) {
+                addDiagnostic(result, "QE: efeito resolvido pelo displayName localizado '" + displayName + "'.");
+                return descriptor;
+            }
+        } catch (lookupError) {
+            addDiagnostic(result, "QE: busca do efeito pelo displayName '" + displayName + "' falhou: " + lookupError);
+            return null;
+        }
+
+        addDiagnostic(result, "QE: efeito não encontrado pelo displayName localizado '" + displayName + "'.");
         return null;
     }
 
-    function invokeEffectAddition(owner, methodName, effectArgument, label, result) {
-        try {
-            if (!owner || typeof owner[methodName] !== "function") {
-                return false;
-            }
+    function getTrackItemComponentCount(trackItem) {
+        var updatedComponents;
 
-            owner[methodName](effectArgument);
-            sleepForHostRefresh();
-            addDiagnostic(result, "Adição de efeito tentada via " + label + ".");
-            return true;
+        try {
+            updatedComponents = trackItem.components;
+            return collectionToArray(updatedComponents).length;
         } catch (error) {
-            addDiagnostic(result, "Adição de efeito via " + label + " falhou: " + error);
-            return false;
+            return 0;
         }
     }
 
+    function refreshAddedComponent(
+        sequence,
+        trackItem,
+        standardLocation,
+        capturedProperty,
+        initialStackLength,
+        allowDisplayFallback,
+        result
+    ) {
+        var refreshAttempt;
+        var refreshedTrackItem;
+        var updatedComponentsReference;
+        var updatedComponents = [];
+        var component;
+        var targetDisplayName = normalizeIdentifier(capturedProperty.componentDisplayName);
+        var componentIndex;
+
+        for (refreshAttempt = 1; refreshAttempt <= 6; refreshAttempt += 1) {
+            sleepForHostRefresh();
+            refreshedTrackItem = getStandardTrackItemAt(sequence, standardLocation, trackItem);
+
+            try {
+                updatedComponentsReference = refreshedTrackItem.components;
+                updatedComponents = collectionToArray(updatedComponentsReference);
+            } catch (readError) {
+                addDiagnostic(result, "DOM padrão: releitura de components falhou na tentativa " + refreshAttempt + ": " + readError);
+                continue;
+            }
+
+            addDiagnostic(
+                result,
+                "DOM padrão: components relido após QE (tentativa="
+                + refreshAttempt
+                + ", antes="
+                + initialStackLength
+                + ", agora="
+                + updatedComponents.length
+                + ")."
+            );
+            component = findCapturedComponentInComponents(updatedComponents, capturedProperty);
+
+            if (component) {
+                return component;
+            }
+        }
+
+        if (allowDisplayFallback && updatedComponents.length > initialStackLength && targetDisplayName) {
+            for (componentIndex = updatedComponents.length - 1; componentIndex >= initialStackLength; componentIndex -= 1) {
+                component = updatedComponents[componentIndex];
+
+                if (normalizeIdentifier(getComponentString(component, "displayName", "")) === targetDisplayName) {
+                    addDiagnostic(
+                        result,
+                        "DOM padrão: novo componente recuperado no final da pilha pelo displayName; matchName retornado='"
+                        + getComponentString(component, "matchName", "")
+                        + "'."
+                    );
+                    return component;
+                }
+            }
+        }
+
+        return null;
+    }
+
     function ensureCapturedComponent(sequence, trackItem, capturedProperty, result) {
-        var component = findCapturedComponent(trackItem, capturedProperty);
+        var component;
+        var standardLocation;
+        var refreshedTrackItem;
         var effectDescriptor;
-        var effectArgument;
         var qeTrackItem;
         var requiredCount;
         var currentCount;
-        var initialCount;
+        var initialStackLength;
+        var additionsMade = 0;
         var addIndex;
 
-        if (component || capturedProperty.componentKind !== "video-effect") {
+        if (capturedProperty.componentKind !== "video-effect") {
+            return findCapturedComponent(trackItem, capturedProperty);
+        }
+
+        try {
+            app.enableQE();
+            addDiagnostic(result, "QE: app.enableQE() executado antes da verificação do efeito.");
+        } catch (enableError) {
+            result.effectAddFailures += 1;
+            addDiagnostic(result, "QE: app.enableQE() falhou: " + enableError);
+            return null;
+        }
+
+        standardLocation = findStandardTrackItemLocation(sequence, trackItem, result);
+        refreshedTrackItem = getStandardTrackItemAt(sequence, standardLocation, trackItem);
+        component = findCapturedComponent(refreshedTrackItem, capturedProperty);
+
+        if (component) {
             return component;
         }
 
@@ -2187,60 +2402,63 @@
             + numberValue(capturedProperty.componentMatchOrdinal, 0)
             + ")."
         );
-        initialCount = countCapturedComponents(trackItem, capturedProperty);
-        effectDescriptor = findQeVideoEffectDescriptor(capturedProperty, result);
-        effectArgument = effectDescriptor
-            || capturedProperty.componentMatchName
-            || capturedProperty.componentDisplayName;
+        qeTrackItem = findQeTrackItem(sequence, refreshedTrackItem, standardLocation, result);
 
-        if (invokeEffectAddition(trackItem.components, "addVideoEffect", effectArgument, "components.addVideoEffect()", result)) {
-            component = findCapturedComponent(trackItem, capturedProperty);
-
-            if (component) {
-                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
-                return component;
-            }
-        }
-
-        if (invokeEffectAddition(trackItem, "addVideoEffect", effectArgument, "TrackItem.addVideoEffect()", result)) {
-            component = findCapturedComponent(trackItem, capturedProperty);
-
-            if (component) {
-                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
-                return component;
-            }
-        }
-
-        if (!effectDescriptor) {
+        if (!qeTrackItem) {
             result.effectAddFailures += 1;
-            addDiagnostic(result, "QE: sem descritor de efeito para executar o fallback addVideoEffect().");
             return null;
         }
 
-        qeTrackItem = findQeTrackItem(sequence, trackItem, result);
+        effectDescriptor = findQeVideoEffectDescriptor(capturedProperty, result);
+
+        if (!effectDescriptor) {
+            result.effectAddFailures += 1;
+            return null;
+        }
 
         requiredCount = Math.max(1, numberValue(capturedProperty.componentMatchOrdinal, 0) + 1);
-        currentCount = countCapturedComponents(trackItem, capturedProperty);
+        currentCount = countCapturedComponents(refreshedTrackItem, capturedProperty);
+        initialStackLength = getTrackItemComponentCount(refreshedTrackItem);
 
         for (addIndex = currentCount; addIndex < requiredCount; addIndex += 1) {
-            if (!invokeEffectAddition(qeTrackItem, "addVideoEffect", effectDescriptor, "QE TrackItem.addVideoEffect()", result)) {
+            try {
+                qeTrackItem.addVideoEffect(effectDescriptor);
+                additionsMade += 1;
+                addDiagnostic(
+                    result,
+                    "QE: qeTrackItem.addVideoEffect() executado para o displayName '"
+                    + capturedProperty.componentDisplayName
+                    + "'."
+                );
+            } catch (addError) {
+                addDiagnostic(result, "QE: qeTrackItem.addVideoEffect() falhou: " + addError);
                 break;
             }
 
-            component = findCapturedComponent(trackItem, capturedProperty);
+            component = refreshAddedComponent(
+                sequence,
+                trackItem,
+                standardLocation,
+                capturedProperty,
+                initialStackLength,
+                addIndex + 1 >= requiredCount,
+                result
+            );
 
             if (component) {
-                result.effectsAdded += Math.max(1, countCapturedComponents(trackItem, capturedProperty) - initialCount);
+                result.effectsAdded += additionsMade;
                 addDiagnostic(
                     result,
-                    "Efeito adicionado e confirmado: matchName='" + capturedProperty.componentMatchName + "'."
+                    "Efeito adicionado via QE e recuperado no DOM padrão: matchName='"
+                    + getComponentString(component, "matchName", "")
+                    + "'."
                 );
                 return component;
             }
         }
 
         result.effectAddFailures += 1;
-        addDiagnostic(result, "O efeito não apareceu em TrackItem.components após as tentativas de adição.");
+        addDiagnostic(result, "O efeito foi enviado ao QE, mas não apareceu após a releitura de TrackItem.components.");
         return null;
     }
 
